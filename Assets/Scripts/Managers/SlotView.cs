@@ -11,24 +11,22 @@ public class SlotView : MonoBehaviour
 
     // Number of distinct symbols the backend can send (ids 0..SymbolCount-1). Every array indexed
     // by symbol id is sized from this, so the count lives in exactly one place.
-    private const int SymbolCount = 13;
+    private const int SymbolCount = 10;
 
     [Header("Symbol Sprites - Assign by Name")]
     // Field names match the backend's symbol "name" exactly, so the two can be checked against
-    // each other at a glance. Where the backend also sends a friendlier "displayName", it's noted.
-    [SerializeField] private Sprite spriteWild;               // ID: 0  (wild)
-    [SerializeField] private Sprite spriteScatter;            // ID: 1  (scatter — triggers Free Games)
-    [SerializeField] private Sprite spriteOrb;                // ID: 2  (triggers Hold & Spin)
-    [SerializeField] private Sprite spriteMystery;            // ID: 3  (Free Games only)
-    [SerializeField] private Sprite spriteWarriors;           // ID: 4  (high — top paytable)
-    [SerializeField] private Sprite spriteLady;               // ID: 5  (high)
-    [SerializeField] private Sprite spriteBook;               // ID: 6  (high)
-    [SerializeField] private Sprite spriteDrum;               // ID: 7  (mid)
-    [SerializeField] private Sprite spriteA;                  // ID: 8  (low — "Ace")
-    [SerializeField] private Sprite spriteK;                  // ID: 9  (low — "King")
-    [SerializeField] private Sprite spriteQ;                  // ID: 10 (low — "Queen")
-    [SerializeField] private Sprite spriteJ;                  // ID: 11 (low — "Jack")
-    [SerializeField] private Sprite sprite10;                 // ID: 12 (low — "Ten")
+    // each other at a glance. The ids are the init's symbol ids and are what the server's matrix
+    // carries — if the backend ever reorders the table, BuildSymbolSpriteArray is what to correct.
+    [SerializeField] private Sprite spritePrince;             // ID: 0  (high — top paytable)
+    [SerializeField] private Sprite spritePrincess;           // ID: 1  (high)
+    [SerializeField] private Sprite spriteCamel;              // ID: 2  (high)
+    [SerializeField] private Sprite spriteParrot;             // ID: 3  (high)
+    [SerializeField] private Sprite spriteTurban;             // ID: 4  (low)
+    [SerializeField] private Sprite spriteCarpet;             // ID: 5  (low)
+    [SerializeField] private Sprite spriteSword;              // ID: 6  (low)
+    [SerializeField] private Sprite spritePotion;             // ID: 7  (low)
+    [SerializeField] private Sprite spriteGenie;              // ID: 8  (wild — reels 2-4 only, carries a multiplier)
+    [SerializeField] private Sprite spriteLamp;               // ID: 9  (scatter — reels 3-5 only, triggers the Genie Wheel)
 
     // Deliberately NOT part of the id-keyed table above and NOT in BuildSymbolSpriteArray: this has
     // no symbol id, the server can never send it, and it is never a spin result. It is the empty
@@ -38,25 +36,26 @@ public class SlotView : MonoBehaviour
     [Tooltip("The \"Empty\" sprite — an empty cell, not a symbol. Drawn behind held Orbs during Hold & Spin.")]
     [SerializeField] private Sprite spriteEmpty;
 
-    // Rect size for symbols whose art is drawn at 1.5x against the 175 pitch.
-    private static readonly Vector2 LargeSymbolSize = new Vector2(262.5f, 262.5f);
+    // LEGACY — Golden Dynasty's Orb and Mystery had symbol ids; Gold of Luck has neither, so these
+    // are no longer in the id table and nothing reads them. Kept, with their scene assignments,
+    // until the Hold & Spin / Mystery cleanup (see ToDo.md) removes the code that would use them.
+    [Header("Legacy - Not Id-Keyed (Hold & Spin / Mystery cleanup pending)")]
+    [SerializeField] private Sprite spriteOrb;
+    [SerializeField] private Sprite spriteMystery;
 
-    // Symbols that need a rect size other than normalSymbolSize, each with its own. Was a flat set
-    // of "large" ids against a single size, until Wild and Lady each turned out to want something
-    // between 175 and 262.5 — sizing is per-symbol art, not a two-tier property.
+    // Rect size for each symbol whose art is not drawn to the 175 pitch, keyed by symbol id. Every
+    // id not listed here uses normalSymbolSize.
     //
-    // Kept next to the sprite fields on purpose: both are id-keyed maps of the same symbol table,
-    // so if the backend ever reorders it again they have to be corrected together — and the sprite
-    // mapping fails loudly (every symbol showing the wrong art) the moment that happens.
+    // Empty on purpose: the old entries were tuned against Golden Dynasty's art, and the Gold of
+    // Luck art has not been measured yet. Add an entry per symbol as the art comes in, e.g.
+    //     { 8, new Vector2(200f, 200f) },  // Genie
+    // Sizing is per-symbol art, not a role: anything above 175 overlaps its vertical neighbours,
+    // which is intentional bleed but also means it swallows clicks aimed at the cells above and below.
+    //
+    // Kept next to the sprite fields on purpose: both are id-keyed maps of the same symbol table, so
+    // if the backend ever reorders it they have to be corrected together.
     private static readonly Dictionary<int, Vector2> SymbolSizeOverrides = new Dictionary<int, Vector2>
     {
-        { 0, new Vector2(200f, 200f) },  // Wild
-        { 4, LargeSymbolSize },          // Warriors
-        { 5, new Vector2(210f, 210f) },  // Lady
-        { 7, LargeSymbolSize },          // Drum
-        { 1, LargeSymbolSize },           // Scatter
-        { 3, new Vector2(250f, 250f) },   // Mystery
-        { 2, new Vector2(300f, 300f) }   // Orb
     };
 
     // Playback speed per symbol, applied wherever that symbol's clip is assigned.
@@ -69,25 +68,23 @@ public class SlotView : MonoBehaviour
     // spin, so leaving one untouched would silently inherit whatever the previous symbol had set
     // on that slot.
     //
-    // All 13 are listed explicitly, so the fallback below is only reached if the backend ever sends
-    // an id this table doesn't know about.
+    // All 10 are listed explicitly, at the default, because none has been tuned yet — the old values
+    // were Golden Dynasty's. Retune each against its own clip when the art is in. The fallback below
+    // is only reached if the backend ever sends an id this table doesn't know about.
     private const float DefaultSymbolAnimationSpeed = 20f;
     //Animation Speeds
     private static readonly Dictionary<int, float> SymbolAnimationSpeeds = new Dictionary<int, float>
     {
-        { 0,  25f },  // Wild
-        { 1,  64f },  // Scatter
-        { 2,  30f },  // Orb
-        { 3,  35f },  // Mystery
-        { 4,  33f },  // Warriors
-        { 5,  86f },  // Lady
-        { 6,  30f },  // Book
-        { 7,  86f },  // Drum
-        { 8,  10f },  // A
-        { 9,  20f },  // K
-        { 10, 15f },  // Q
-        { 11, 20f },  // J
-        { 12, 13f }   // 10
+        { 0, DefaultSymbolAnimationSpeed },  // Prince
+        { 1, DefaultSymbolAnimationSpeed },  // Princess
+        { 2, DefaultSymbolAnimationSpeed },  // Camel
+        { 3, DefaultSymbolAnimationSpeed },  // Parrot
+        { 4, DefaultSymbolAnimationSpeed },  // Turban
+        { 5, DefaultSymbolAnimationSpeed },  // Carpet
+        { 6, DefaultSymbolAnimationSpeed },  // Sword
+        { 7, DefaultSymbolAnimationSpeed },  // Potion
+        { 8, DefaultSymbolAnimationSpeed },  // Genie
+        { 9, DefaultSymbolAnimationSpeed }   // Lamp
     };
 
     // Internal array built from named sprites
@@ -95,31 +92,37 @@ public class SlotView : MonoBehaviour
 
     [Header("Win Animation Sprite Arrays")]
     [Tooltip("Optional per-symbol win-animation frame sequences. Leave any empty until real art exists — animation playback already no-ops safely on an empty list.")]
-    [SerializeField] private List<Sprite> animSpritesWild;           // ID: 0
-    [SerializeField] private List<Sprite> animSpritesScatter;        // ID: 1
-    [SerializeField] private List<Sprite> animSpritesOrb;            // ID: 2
-    [SerializeField] private List<Sprite> animSpritesMystery;        // ID: 3
-    [SerializeField] private List<Sprite> animSpritesWarriors;       // ID: 4
-    [SerializeField] private List<Sprite> animSpritesLady;           // ID: 5
-    [SerializeField] private List<Sprite> animSpritesBook;           // ID: 6
-    [SerializeField] private List<Sprite> animSpritesDrum;           // ID: 7
-    [SerializeField] private List<Sprite> animSpritesA;              // ID: 8
-    [SerializeField] private List<Sprite> animSpritesK;              // ID: 9
-    [SerializeField] private List<Sprite> animSpritesQ;              // ID: 10
-    [SerializeField] private List<Sprite> animSpritesJ;              // ID: 11
-    [SerializeField] private List<Sprite> animSprites10;             // ID: 12
+    [SerializeField] private List<Sprite> animSpritesPrince;         // ID: 0
+    [SerializeField] private List<Sprite> animSpritesPrincess;       // ID: 1
+    [SerializeField] private List<Sprite> animSpritesCamel;          // ID: 2
+    [SerializeField] private List<Sprite> animSpritesParrot;         // ID: 3
+    [SerializeField] private List<Sprite> animSpritesTurban;         // ID: 4
+    [SerializeField] private List<Sprite> animSpritesCarpet;         // ID: 5
+    [SerializeField] private List<Sprite> animSpritesSword;          // ID: 6
+    [SerializeField] private List<Sprite> animSpritesPotion;         // ID: 7
+    [SerializeField] private List<Sprite> animSpritesGenie;          // ID: 8
+    [SerializeField] private List<Sprite> animSpritesLamp;           // ID: 9
+
+    // LEGACY — no symbol id in this game, so not in the table above and never indexed by id. The Orb
+    // and Mystery code that reads animationSpriteArrays[orbId] / [mysteryId] is inert while both ids
+    // are -1. Kept, with their scene assignments, until the cleanup (see ToDo.md).
+    [Header("Legacy - Not Id-Keyed (Hold & Spin / Mystery cleanup pending)")]
+    [SerializeField] private List<Sprite> animSpritesOrb;
+    [SerializeField] private List<Sprite> animSpritesMystery;
 
     [Tooltip("The Orb's SECOND animation, played only during a Hold & Spin round. Leave it empty and Orbs keep their base-game animation throughout — the feature still switches, it just switches to the same frames.")]
     [SerializeField] private List<Sprite> animSpritesOrbFeature;
 
+    [Tooltip("One-shot played on an Orb as its dragon lifts off, bridging the feature clip and the base clip. Empty = the Orb cuts straight to its base animation as before.")]
+    [SerializeField] private List<Sprite> animSpritesOrbCollect;
+
+    // Stacked-Wild art, switched off for now — see WildStackingEnabled.
+    [Header("Stacked Wild (disabled - see WildStackingEnabled)")]
     [Tooltip("Wild drawn as TWO stacked Wilds, for when two winning Wilds sit directly one above the other in a column. Empty = that pair just plays two ordinary single animations.")]
     [SerializeField] private List<Sprite> animSpritesWild2;
 
     [Tooltip("Wild drawn as THREE stacked Wilds, for a full column of winning Wilds. Empty = falls back to single animations the same way.")]
     [SerializeField] private List<Sprite> animSpritesWild3;
-
-    [Tooltip("One-shot played on an Orb as its dragon lifts off, bridging the feature clip and the base clip. Empty = the Orb cuts straight to its base animation as before.")]
-    [SerializeField] private List<Sprite> animSpritesOrbCollect;
 
     // Internal array of animation sprite lists
     private List<Sprite>[] animationSpriteArrays;
@@ -494,19 +497,16 @@ public class SlotView : MonoBehaviour
     {
         // Build the symbol sprite array from named sprite fields
         symbolSprites = new Sprite[SymbolCount];
-        symbolSprites[0] = spriteWild;
-        symbolSprites[1] = spriteScatter;
-        symbolSprites[2] = spriteOrb;
-        symbolSprites[3] = spriteMystery;
-        symbolSprites[4] = spriteWarriors;
-        symbolSprites[5] = spriteLady;
-        symbolSprites[6] = spriteBook;
-        symbolSprites[7] = spriteDrum;
-        symbolSprites[8] = spriteA;
-        symbolSprites[9] = spriteK;
-        symbolSprites[10] = spriteQ;
-        symbolSprites[11] = spriteJ;
-        symbolSprites[12] = sprite10;
+        symbolSprites[0] = spritePrince;
+        symbolSprites[1] = spritePrincess;
+        symbolSprites[2] = spriteCamel;
+        symbolSprites[3] = spriteParrot;
+        symbolSprites[4] = spriteTurban;
+        symbolSprites[5] = spriteCarpet;
+        symbolSprites[6] = spriteSword;
+        symbolSprites[7] = spritePotion;
+        symbolSprites[8] = spriteGenie;
+        symbolSprites[9] = spriteLamp;
 
         // Validate
         for (int i = 0; i < symbolSprites.Length; i++)
@@ -519,19 +519,16 @@ public class SlotView : MonoBehaviour
 
         // Build the animation sprite arrays (any entry left empty simply won't animate)
         animationSpriteArrays = new List<Sprite>[SymbolCount];
-        animationSpriteArrays[0] = animSpritesWild;
-        animationSpriteArrays[1] = animSpritesScatter;
-        animationSpriteArrays[2] = animSpritesOrb;
-        animationSpriteArrays[3] = animSpritesMystery;
-        animationSpriteArrays[4] = animSpritesWarriors;
-        animationSpriteArrays[5] = animSpritesLady;
-        animationSpriteArrays[6] = animSpritesBook;
-        animationSpriteArrays[7] = animSpritesDrum;
-        animationSpriteArrays[8] = animSpritesA;
-        animationSpriteArrays[9] = animSpritesK;
-        animationSpriteArrays[10] = animSpritesQ;
-        animationSpriteArrays[11] = animSpritesJ;
-        animationSpriteArrays[12] = animSprites10;
+        animationSpriteArrays[0] = animSpritesPrince;
+        animationSpriteArrays[1] = animSpritesPrincess;
+        animationSpriteArrays[2] = animSpritesCamel;
+        animationSpriteArrays[3] = animSpritesParrot;
+        animationSpriteArrays[4] = animSpritesTurban;
+        animationSpriteArrays[5] = animSpritesCarpet;
+        animationSpriteArrays[6] = animSpritesSword;
+        animationSpriteArrays[7] = animSpritesPotion;
+        animationSpriteArrays[8] = animSpritesGenie;
+        animationSpriteArrays[9] = animSpritesLamp;
     }
 
     private void InitializeReels()
@@ -1985,12 +1982,14 @@ public class SlotView : MonoBehaviour
         //
         // A retrigger (spinsAwarded during a free spin) is deliberately not counted: the round is
         // already running and has no separate trigger sequence to make way for.
-        bool freeGamesTriggered = gameManager != null && gameManager.lastResult != null
+        // Both gated on the controller's master switches, so a feature that is switched off does not
+        // make this skip the win presentation for a trigger the controller will never act on.
+        bool freeGamesTriggered = GameManager.FreeGamesEnabled && gameManager != null && gameManager.lastResult != null
             && gameManager.lastResult.freeGame != null
             && gameManager.lastResult.freeGame.spinsAwarded
             && !gameManager.lastResult.freeGame.isFreeGame;
 
-        bool holdAndSpinTriggered = gameManager != null && gameManager.lastResult != null
+        bool holdAndSpinTriggered = GameManager.HoldAndSpinEnabled && gameManager != null && gameManager.lastResult != null
             && gameManager.lastResult.holdAndSpin != null
             && gameManager.lastResult.holdAndSpin.triggered;
 
@@ -2159,6 +2158,15 @@ public class SlotView : MonoBehaviour
         }
     }
 
+    // Master switch for the stacked-Wild presentation, OFF for Gold of Luck. Golden Dynasty's Wild
+    // stacked into one tall animation; the Genie has no such art, and a stack of Genies would also
+    // hide their individual multiplier badges. Everything below is left intact rather than deleted,
+    // in case the Genie ever gets it — flip this to true and wire animSpritesWild2 / animSpritesWild3.
+    // Un-serialized on purpose, like the other tuning constants: a serialized flag would be
+    // overridden by whatever the scene saved. static readonly rather than const so the compiler
+    // does not flag the code behind the switch as unreachable.
+    private static readonly bool WildStackingEnabled = false;
+
     // The stacked-Wild clip for a run of this height, or null if that art was never wired.
     private List<Sprite> GetWildStackFrames(int stackHeight)
     {
@@ -2187,6 +2195,9 @@ public class SlotView : MonoBehaviour
         covered = new HashSet<int>();
 
         int wildId = WildSymbolId;
+
+        // Switched off: no runs, so every winning Wild takes the ordinary per-cell path.
+        if (!WildStackingEnabled) return;
 
         if (wildId < 0 || flatPositions == null || currentDisplayMatrix == null) return;
 
@@ -2422,7 +2433,7 @@ public class SlotView : MonoBehaviour
             // (Blanks reach here the same way and are still lit; deliberately left for later.)
             int winBonusId = (gameManager != null && gameManager.gameConfig != null)
                 ? gameManager.gameConfig.scatterSymbolId
-                : 0;
+                : -1;
             if (symbolId == winBonusId) continue;
 
             // A cell swallowed by a taller Wild below it. Its reel icon still has to go, or it

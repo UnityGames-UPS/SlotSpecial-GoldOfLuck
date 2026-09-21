@@ -28,6 +28,21 @@ public class GameManager : MonoBehaviour
     [Header("Win Settings")]
     [SerializeField] private double bigWinMultiplierThreshold = 500.0;
 
+    // Master switches for the two feature rounds, both OFF while the backend binding is brought up.
+    // Off means the round is never entered: the trigger spin is presented as an ordinary spin and
+    // ProcessSpinResult carries on. Nothing is removed — the views, the round state and the
+    // lifecycle below are all intact, so flipping a switch to true restores the feature as it was.
+    //
+    // Free Games off also means the server can still put the player into a round (a wheel landing on
+    // a free-games slice does) which this client then plays as normal spins: the server treats them
+    // as free, and the optimistic bet deduction in StartSpin is overwritten by the balance it sends.
+    //
+    // Un-serialized on purpose, like the other tuning constants: a serialized flag would be
+    // overridden by whatever the scene saved. static readonly rather than const so the compiler does
+    // not flag the code behind a switch as unreachable.
+    internal static readonly bool FreeGamesEnabled = false;
+    internal static readonly bool HoldAndSpinEnabled = false;
+
     internal GameConfig gameConfig;
     internal PlayerData playerData;
     internal SpinResult lastResult;
@@ -465,7 +480,7 @@ public class GameManager : MonoBehaviour
 
         // The initial trigger — a paid base spin that awarded spins. Its scatter sequence runs
         // before the round is entered.
-        if (lastResult != null && lastResult.freeGame != null
+        if (FreeGamesEnabled && lastResult != null && lastResult.freeGame != null
             && lastResult.freeGame.spinsAwarded && !lastResult.freeGame.isFreeGame)
         {
             yield return StartCoroutine(DelayScatterTriggerResult());
@@ -638,7 +653,7 @@ public class GameManager : MonoBehaviour
     // and ProcessSpinResult entering the round — so the hold can never outlast the entry.
     private bool IsFreeGamesTrigger(SpinResult result)
     {
-        return !isInFreeSpins && result != null && result.freeGame != null
+        return FreeGamesEnabled && !isInFreeSpins && result != null && result.freeGame != null
             && result.freeGame.spinsAwarded && !result.freeGame.isFreeGame;
     }
 
@@ -670,7 +685,7 @@ public class GameManager : MonoBehaviour
         }
 
         // The triggering spin is an ordinary paid base spin that happens to report triggered.
-        if (holdAndSpin != null && holdAndSpin.triggered)
+        if (HoldAndSpinEnabled && holdAndSpin != null && holdAndSpin.triggered)
         {
             StartHoldAndSpin(holdAndSpin);
             lastResult = null;
@@ -1119,7 +1134,7 @@ public class GameManager : MonoBehaviour
 
     internal double GetTotalPay()
     {
-        double activeLine = (gameConfig != null && gameConfig.activeLine > 0) ? gameConfig.activeLine : 27;
+        double activeLine = (gameConfig != null && gameConfig.activeLine > 0) ? gameConfig.activeLine : 50;
         return currentBetAmount * activeLine;
     }
 

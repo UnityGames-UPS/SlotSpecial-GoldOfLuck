@@ -11,7 +11,7 @@ public class InitData
     public ServerFeatures features;
     public ServerUIData uiData;
     public ServerPlayer player;
-    // Golden Dynasty sends no jackpot block. Kept because the platform's separate "jackpot:sync"
+    // Gold of Luck sends no jackpot block. Kept because the platform's separate "jackpot:sync"
     // event reuses these types, and the init-time read is already null-guarded.
     public JackpotData jackpotData;
 }
@@ -41,43 +41,69 @@ public class JackpotSyncData
 [Serializable]
 public class ServerGameData
 {
+    // Confirmed against a live init. "lines" is a leftover of the payline backends and arrives
+    // EMPTY; it is read only for the reel count, which falls back to 5.
     public List<List<int>> lines;
     public List<double> bets;
-    // The per-line-bet multiplier: total bet = bet * totalLines. Golden Dynasty has no selectable
-    // lines, so all of them are always in play and there is no separate "activeLine" any more.
-    public int totalLines;
+    // Total bet = the selected bet x this: 0.01 x 50 = 0.50, the cost of every captured spin.
+    public int creditDivisor;
+
+    // "totalLines" is sent as 243 — the WAYS count — and is deliberately unbound. Read as the old
+    // "lines to multiply the bet by" it would make every bet display and deduction 4.86x too high.
 }
 
 [Serializable]
 public class ServerFeatures
 {
+    public ServerGenieWheelFeature genieWheel;
+    public ServerGenieWildFeature genieWild;
     public ServerFreeGamesFeature freeGames;
-    public ServerHoldAndSpinFeature holdAndSpin;
+}
+
+[Serializable]
+public class ServerGenieWheelFeature
+{
+    // Confirmed against a live init. The converter logs an error if it ever comes back empty, so a
+    // renamed array fails loudly rather than leaving a wheel with no slices.
+    public List<ServerWheelSlice> segments;
+
+    // Sent and deliberately unbound: "enabled", "symbolId" (9, the Lamp — found through the symbol
+    // table's group instead), "minTrigger" (3) and "requiredReels" ([2,3,4], zero-based, so reels 3,
+    // 4 and 5). requiredReels is the rule the scatter anticipation will need when it is reworked.
+}
+
+[Serializable]
+public class ServerWheelSlice
+{
+    public int sliceIndex;
+    public string type;       // "MULTIPLIER" or "FREE_GAMES"
+    public int multiplier;    // 0 on a FREE_GAMES slice
+    public int freeGames;     // 0 on a MULTIPLIER slice
+}
+
+[Serializable]
+public class ServerGenieWildFeature
+{
+    // The values a landed Genie can carry. The per-Genie value itself arrives with each spin, in
+    // payload.genieMultipliers — this list is only for describing the feature.
+    // "symbolId" and "maxMultiplierProduct" are sent too and deliberately unbound: the Genie is
+    // found through the symbol table's "group", and the product cap is the server's business.
+    public List<int> multipliers;
 }
 
 [Serializable]
 public class ServerFreeGamesFeature
 {
-    public string description;
-    public int triggerCount;      // scatters needed to trigger
-    public int awardedCount;      // spins granted on trigger
-    public bool retriggerEnabled;
-    public int retriggerCount;    // spins granted on retrigger
-    public bool mysterySymbol;
-}
-
-[Serializable]
-public class ServerHoldAndSpinFeature
-{
-    public string description;
-    public int triggerCount;      // orbs needed to trigger
-    public int freeSpinsAwarded;  // respins granted, and reset to on each new orb
-    public List<double> orbPrizes;
+    // Only the cap is bound. "payMultiplier" is sent (1) but appliedMultiplier reads 1 on every
+    // captured win, free games included, and the win amounts arrive already multiplied. The old
+    // triggerCount / awardedCount / retriggerCount are gone: the wheel decides what a trigger awards.
+    public int maxTotalFreeGames;
 }
 
 [Serializable]
 public class ServerUIData
 {
+    // The name is inherited from the payline backends; it holds the symbol table.
     public PaylineData paylines;
 }
 
@@ -91,17 +117,16 @@ public class PaylineData
 public class ServerSymbolInfo
 {
     public int id;
-    public string name;         // stable identifier ("Wild", "Scatter", "Orb", "Mystery", "A", ...)
-    public string displayName;  // player-facing ("Ace", "King", ...)
-    // Line paytable, descending from a full-reel match: index 0 = 5-of-a-kind, 1 = 4, 2 = 3, and a
-    // 4th entry (Warriors only) = 2. Absent entirely on Orb and Mystery, empty on Wild.
-    public List<double> multiplier;
-    // Scatter only, and paid on total bet rather than per line — hence its own field.
-    public List<double> scatterMultiplier;
-    public bool isSpecialSymbol; // true for Wild/Scatter/Orb/Mystery, false for paying symbols
-    public bool isBonusSymbol;   // currently false on every symbol; role unclear
-    // NOT sent yet, though the backend's own config has them: "type", "description", "minMatch".
-    // See TODO.md "Pending backend" — until "type" arrives the four specials are told apart by name.
+    public string name;         // "Prince", "Genie", "Lamp", ... — display only, never used to find a role
+    // "high", "low", "wild" or "scatter". This is what tells the special symbols apart; the init
+    // sends no isSpecialSymbol flag and no displayName. "description" only repeats the group.
+    public string group;
+    // 3 on every symbol, wild and scatter included, where it means nothing.
+    public int minMatch;
+    // ASCENDING from a minMatch match: index 0 = 3-of-a-kind, 1 = 4, 2 = 5. Credits, not cash — one
+    // credit is the selected bet. Empty on Genie and Lamp. The converter reverses it, because the
+    // client works descending from a full-reel match.
+    public List<double> payout;
 }
 
 [Serializable]
@@ -120,28 +145,15 @@ public class ServerSpinResponse
     public string id = "ResultData";
     public bool success;
     // Row-major and top-level, NOT nested under payload: 3 rows x 5 columns, values as strings.
-    // Every row is live — this game has none of the decorative padding rows Sizzling 7s sent.
     public List<List<string>> matrix;
     public ServerPayload payload;
-    public ServerResultFeatures features;
     public ServerPlayerBalance player;
-
-    // Per-cell notes, keyed "row:col" in the same row-major space as matrix. Only Mystery uses it
-    // today: a cell that landed as a Mystery gets an entry, and matrix already holds the symbol it
-    // revealed into. Values are the string "mystery_" + symbol NAME ("mystery_J", "mystery_10",
-    // "mystery_Mystery") and are deliberately never parsed — see ConvertMysteryPositions.
-    public Dictionary<string, string> cellMetadata;
-
-    // "features.holdAndSpin.heldPositions" stays deliberately unbound. It is populated now, but it
-    // describes exactly the cells payload.orbPrizeMap already covers during a round, and it is one
-    // of the two fields that persist stale after a round ends. Binding it would only invite someone
-    // to read it. Newtonsoft ignores undeclared fields, so leaving it out costs nothing.
 }
 
 [Serializable]
 public class ServerPlayerBalance
 {
-    // Nullable because the old backend sometimes sent null here. Golden Dynasty has always sent a
+    // Nullable because an older backend sometimes sent null here. Gold of Luck has always sent a
     // real number so far, but the guard is free.
     public double? balance;
 }
@@ -149,67 +161,94 @@ public class ServerPlayerBalance
 [Serializable]
 public class ServerPayload
 {
-    // The spin's total win, and the only figure to display. The server sends the grand total here
-    // and the breakdown separately, so the client never sums anything itself. On a spin with no
-    // scatter pay it happens to equal the sum of lineWins[].win, which is all the samples so far
-    // have shown — but it is the total, not the line subtotal.
-    public double currentWinning;
-    // Per-line breakdown, used only for the amount label on each line during the Phase 2 cycle.
-    public List<ServerLineWin> lineWins;
-    // The scatter pay, on total bet rather than per line. Informational: it is already part of
-    // currentWinning. Never add it — that would double-count the scatter on every spin one pays.
-    public double scatterWin;
-    public int scatterCount;
+    // ONLY the ways subtotal. On a spin whose Lamps triggered the wheel this is short of what was
+    // paid — the wheel prize is not in it. Never display it; see grandTotalWin.
+    public double winAmount;
+    // One entry per winning SYMBOL, not per way — waysCount says how many ways it covers.
+    public List<ServerWaysWin> waysWins;
 
-    // Every Orb on the board, keyed "row:col" in the same row-major space as matrix and
-    // cellMetadata. Present on every spin, base game included — an Orb always carries a prize.
-    // Values are already multiplied out to cash; the client displays them as sent and never
-    // divides back to the info page's tier. See HoldAndSpin.md section 1.
-    //
-    // This is the ONLY field the client reads for Orb state. features.holdAndSpin's orbCount and
-    // heldPositions describe the same cells during a round but both persist stale after one ends,
-    // and newOrbCount reports 0 on the triggering spin even though every Orb there is new. This map
-    // has been correct on every captured response, including the spins where those were not.
-    public Dictionary<string, double> orbPrizeMap;
+    // Every Genie on the board, keyed "row,col" (a COMMA, unlike the old "row:col" maps), value the
+    // multiplier that Genie carries. Sent for every Genie whether or not it is part of a win, so it
+    // is a landing-time fact, not a win-time one.
+    public Dictionary<string, int> genieMultipliers;
+
+    public ServerGenieWheelResult genieWheel;
+    public ServerFreeGamesResult freeGames;
+
+    // The spin's total: ways plus wheel prize, and the only figure to display. The balance moves by
+    // exactly this minus the bet (5337.83 -> 5354.33 on a 17.00 win at a 0.50 bet), and free spins
+    // deduct no bet, so there it moves by this alone.
+    public double grandTotalWin;
+
+    // "netReturnRatio" (grandTotalWin over total bet) is sent and deliberately unbound: the
+    // controller already derives the same ratio from the win and the total bet.
 }
 
 [Serializable]
-public class ServerLineWin
+public class ServerWaysWin
 {
-    public int lineIndex;
-    // Reel indices that took part in the win — NOT [row, col] pairs. The row for each reel comes
-    // from the payline definition at gameData.lines[lineIndex].
-    public List<int> positions;
-    public double win;
+    public int symbolId;
+    public int matchCount;    // reels matched from the left: 3, 4 or 5
+    public int waysCount;     // how many ways this symbol wins on
+    // Every cell that takes part, Genies standing in for the symbol included, one entry each,
+    // ordered by column then row. This is the union across all the ways, not one path.
+    public List<ServerCell> matchedPositions;
+    // Already inside winInCash. Kept so the view can show "x2" without dividing anything back out.
+    public int genieMultiplierProduct;
+    public double winInCash;
+
+    // Sent and deliberately unbound: basePayout, winInCredits, winType ("WAYS_MATCH" is the only
+    // value seen) and appliedMultiplier, which has read 1 on every captured win. winInCash is
+    // basePayout x waysCount x genieMultiplierProduct, already converted, so nothing needs redoing.
 }
 
 [Serializable]
-public class ServerResultFeatures
+public class ServerCell
 {
-    public ServerFreeGameResult freeGame;
-    public ServerHoldAndSpinResult holdAndSpin;
+    public int row;
+    public int col;
 }
 
 [Serializable]
-public class ServerFreeGameResult
+public class ServerGenieWheelResult
 {
-    public bool isFreeGame;
-    public int freeGameCount;
-    public bool freeGameAdded;
-    public string gameType;
-    public int currentGameIndex;
-    public double totalRoundWin;
-}
-
-[Serializable]
-public class ServerHoldAndSpinResult
-{
-    public bool active;
     public bool triggered;
-    public int spinsRemaining;
-    public int orbCount;
-    public int newOrbCount;
-    public double totalOrbPayout;
+    // Absent unless triggered.
+    public ServerWheelResult result;
+}
+
+[Serializable]
+public class ServerWheelResult
+{
+    // Indexes the slice list sent at init. multiplierAwarded and freeGamesAwarded repeat that
+    // slice's own figures, so the client can cross-check what it is about to draw.
+    public int sliceIndex;
+    public string type;
+    public int multiplierAwarded;
+    public int freeGamesAwarded;
+    // multiplierAwarded x the TOTAL bet, even on a free spin (18 x 0.50 = 9.00). Already inside
+    // grandTotalWin.
+    public double winInCash;
+}
+
+[Serializable]
+public class ServerFreeGamesResult
+{
+    // Spins played so far INCLUDING this one: 0 on the spin that triggers a round, 3 on the last of
+    // three. After the spin, like remaining.
+    public int played;
+    // Spins left after this one. 3 on the trigger spin itself.
+    public int remaining;
+    // The round's running total: the sum of the FREE spins' wins. The trigger spin's own win is
+    // not in it — it reads 0 there.
+    public double totalFreeGamesWin;
+
+    // Sent and deliberately unbound, because both read differently from their old namesakes:
+    //  - "inFreeGames" is the state AFTER the spin. It is true on the trigger spin and false on the
+    //    last free spin, itself a free game. It is not "this spin was free".
+    //  - "triggered" stays true for every spin of a round, the last included, and is not a
+    //    per-spin trigger flag.
+    // "totalAwarded" is sent as well; the controller derives the same figure from played + remaining.
 }
 
 #endregion
@@ -227,7 +266,8 @@ public class SpinRequest
 public class SpinPayload
 {
     // betIndex is the only field with a confirmed effect. The server owns free-spin state, so
-    // there is no isFreeSpin flag to send any more.
+    // there is no isFreeSpin flag to send. The mock client also sends "spins": 100; nobody knows
+    // what it does, and this client deliberately does not send it.
     public int betIndex;
 }
 
@@ -239,19 +279,27 @@ public class SpinPayload
 public class GameConfig
 {
     public int reelCount = 5;
-    // Every row the server sends is live and pays. Sizzling 7s also sent decorative padding rows,
-    // which is why a separate totalResponseRowCount and an active-row offset used to exist.
+    // Every row the server sends is live and pays.
     public int rowCount = 3;
 
-    // Number of paylines, and equally the per-line-bet multiplier: total bet = bet * activeLine.
+    // Total bet = selected bet x activeLine. Named for the payline games; here it is the init's
+    // creditDivisor (50), and has nothing to do with the 243 ways.
     public int activeLine = 50;
 
-    public List<List<int>> paylines;
     public List<double> availableBets;
     public List<SymbolInfo> symbols;
 
+    // The Genie Wheel's slices, sorted by sliceIndex. Empty means the init carried none.
+    public List<WheelSlice> wheelSlices;
+    // The multipliers a Genie can carry, for describing the feature.
+    public List<int> wildMultipliers;
+    // Cap on spins one round can accumulate, retriggers included.
+    public int maxTotalFreeGames;
+
     // Resolved from the init symbol table. -1 means "not present", so an unresolved role can never
-    // collide with a real symbol id the way a 0 default would.
+    // collide with a real symbol id the way a 0 default would. Orb and Mystery no longer exist in
+    // this game and stay -1; the fields remain only because SlotView and SocketIOManager still read
+    // them, and go when Hold & Spin and Mystery are stripped.
     public int wildSymbolId = -1;
     public int scatterSymbolId = -1;
     public int orbSymbolId = -1;
@@ -265,20 +313,34 @@ public class SymbolInfo
     public string name;
     public string displayName;
     // Descending from a full-reel match: index 0 = reelCount-of-a-kind, 1 = one fewer, and so on.
+    // In credits — multiply by the selected bet for cash.
     public List<double> multipliers;
-    // Scatter only; paid on total bet rather than per line.
+    // Always empty here: no symbol pays on scatter count. Kept for the info card's scatter branch.
     public List<double> scatterMultipliers;
 
     public bool isWild;
     public bool isScatter;
-    public bool isOrb;
-    public bool isMystery;
-    // Straight from the server's isSpecialSymbol — true for all four of the above.
+    // True for the Genie and the Lamp.
     public bool isSpecial;
 
-    // Fewest matching symbols that pay, derived from the paytable's length. 0 when the symbol has
-    // no line paytable at all (Wild, Orb, Mystery).
+    // Fewest matching symbols that pay. 0 when the symbol has no paytable (Genie, Lamp).
     public int minMatch;
+}
+
+public enum WheelSliceType
+{
+    Multiplier,
+    FreeGames
+}
+
+[Serializable]
+public class WheelSlice
+{
+    public int sliceIndex;
+    public WheelSliceType type;
+    // Times the TOTAL bet. 0 on a free-games slice.
+    public int multiplier;
+    public int freeGames;
 }
 
 #endregion
@@ -297,93 +359,111 @@ public class SpinResult
 {
     // Column-major: [reel][row], the transpose of the server's row-major matrix.
     public List<List<int>> resultMatrix;
+
+    // Everything the spin paid — ways plus wheel prize — from grandTotalWin. This is the figure to
+    // show and the one the balance moved by.
     public double winAmount;
+    // The ways wins alone. The gap to winAmount is the wheel prize, which is presented separately.
+    public double waysWinAmount;
+
+    // One entry per winning symbol.
     public List<WinLine> winLines;
     public PlayerData playerData;
 
-    // Always present — the server sends the free-game block on every spin, in or out of a round.
+    // Always present — the server sends the free-games block on every spin, in or out of a round.
     public FreeGameData freeGame;
 
-    // Cells that landed as a Mystery symbol, as flat indices (row * reelCount + col) — the same
-    // space WinLine.positions uses. resultMatrix already holds what each one revealed into, so
-    // these are positions only: draw a Mystery there, play the reveal, uncover what is beneath.
-    public List<int> mysteryPositions;
+    // Every Genie on the board: flat index (row * reelCount + col) -> its multiplier. Empty when
+    // there is none. Populated whether or not the Genie is part of a win.
+    public Dictionary<int, int> genieMultipliers;
 
-    // Always present — the server sends the hold-and-spin block on every spin, in or out of a
-    // round, and orbPrizes is populated whenever any Orb is on the board.
+    // Always present. triggered is false on almost every spin.
+    public GenieWheelData genieWheel;
+
+    // TRANSITIONAL — nothing sends either of these any more, so both are always empty. They stay so
+    // the Mystery and Hold & Spin code still compiles, and go when those features are stripped.
+    public List<int> mysteryPositions;
     public HoldAndSpinData holdAndSpin;
 }
 
+/// <summary>
+/// One winning symbol's ways win. Named for the payline games it replaced, whose one-line-at-a-time
+/// presentation still consumes it.
+/// </summary>
 [Serializable]
 public class WinLine
 {
+    // Position in the response's waysWins, not a payline number — there are no paylines.
     public int lineId;
-    // Not resolvable from the wire data: the server reports which cells a line covers, not which
-    // symbol paid, and wild substitution means the first cell is not reliably the paying symbol.
     public int symbolId;
-    // Flat indices into the active grid: row * reelCount + col.
+    // Flat indices into the active grid: row * reelCount + col. Every cell in the win.
     public List<int> positions;
     public double winAmount;
+
+    // Reels matched from the left, and how many ways the symbol wins on.
+    public int matchCount;
+    public int waysCount;
+    // Product of the Genies in the win, already inside winAmount. 1 when there is none.
+    public int multiplier;
 }
 
 /// <summary>
-/// The free-games facts for one spin, straight from features.freeGame. Everything here is
-/// server-authoritative per spin; the round-level running totals GameManager needs (spins used,
-/// total awarded) are derived from these rather than sent.
+/// The free-games facts for one spin, mapped from payload.freeGames onto the meanings the
+/// controller was built around. The mapping lives in the converter so the controller never sees
+/// the wire's post-spin flags — see ServerFreeGamesResult.
 /// </summary>
 [Serializable]
 public class FreeGameData
 {
-    // True when this spin was itself played on free-game credit. False on the spin that triggers
-    // a round — that one is a paid base spin and pays out normally.
+    // True when this spin was itself played on free-game credit. False on the spin that triggers a
+    // round — that one is a paid base spin and pays out normally. Derived from played, which is 0
+    // on the trigger spin and 1 or more on every free one, the last included.
     public bool isFreeGame;
 
-    // Spins left AFTER this one. Already decremented by the server, and retriggers are folded in,
-    // so it can go up as well as down (6 -> 11 -> 10 -> 15 in a captured round).
+    // Spins left AFTER this one. Retriggers are folded in, so it can go up as well as down.
     public int spinsRemaining;
 
-    // Set on any spin that awards spins — both the initial trigger and every retrigger. Paired
-    // with isFreeGame it distinguishes the two: trigger is (awarded && !isFreeGame), retrigger is
-    // (awarded && isFreeGame).
+    // Set on any spin whose wheel landed on a free-games slice — both the initial trigger and a
+    // retrigger. Paired with isFreeGame it tells them apart: trigger is (awarded && !isFreeGame),
+    // retrigger is (awarded && isFreeGame).
     public bool spinsAwarded;
 
-    // The round's running total, server-authoritative. The old backend sent no aggregate and the
-    // client had to accumulate, which drifted whenever a response was missed.
+    // The round's running total, server-authoritative. Excludes the trigger spin's own win.
     public double roundWin;
 }
 
 /// <summary>
-/// The hold-and-spin facts for one spin. Deliberately narrower than the wire block: orbCount,
-/// newOrbCount and heldPositions are all dropped, because orbPrizes carries the same information
-/// and is the only one of the four that has never been observed wrong. See HoldAndSpin.md
-/// section 8, "orbPrizeMap is the client's only source for Orb state".
+/// What the Genie Wheel did on one spin. The landing slice is a server fact: the view animates to
+/// it and shows what it is given, never picking a slice or deriving a prize from an angle.
+/// </summary>
+[Serializable]
+public class GenieWheelData
+{
+    // True on the spin whose Lamps triggered the wheel — in the base game or on a free spin.
+    public bool triggered;
+
+    // Indexes GameConfig.wheelSlices.
+    public int sliceIndex;
+    public WheelSliceType type;
+    // Times the total bet; 0 for a free-games slice.
+    public int multiplier;
+    // Spins awarded; 0 for a multiplier slice.
+    public int freeGames;
+    // The cash prize, already inside SpinResult.winAmount.
+    public double winAmount;
+}
+
+/// <summary>
+/// TRANSITIONAL. Hold and Spin no longer exists in this game and nothing fills this in beyond an
+/// empty instance. Removed together with HoldAndSpinView.
 /// </summary>
 [Serializable]
 public class HoldAndSpinData
 {
-    // True for the whole round INCLUDING the triggering spin, false on the payout spin.
-    //
-    // This is the single start/end signal. Do not end a round on spinsRemaining reaching zero:
-    // captured rounds that ended by filling the board reported 3 and 2 remaining, because a newly
-    // landed Orb had just reset the counter on the same spin that closed the round.
     public bool active;
-
-    // True only on the spin that starts a round — the intro cue. That spin is an ordinary paid
-    // base spin; every spin after it is free.
     public bool triggered;
-
-    // Spins left after this one, reset to 3 whenever an Orb lands. Display only.
     public int spinsRemaining;
-
-    // totalOrbPayout: 0 for the whole round, then the final sum on the payout spin. Informational
-    // ONLY — do not display it. The money arrives through currentWinning like every other win, and
-    // only that figure is rounded: one captured payout read 12.100000000000001 here against a clean
-    // 12.1 in currentWinning, which is also what the balance moved by.
     public double roundWin;
-
-    // Every Orb on the board, flat index (row * reelCount + col) -> cash prize. Populated on every
-    // spin an Orb is present, in or out of a round. Prizes are assigned when an Orb lands and are
-    // then frozen for the rest of the round, so a cell already drawn never needs rewriting.
     public Dictionary<int, double> orbPrizes;
 }
 
@@ -423,6 +503,10 @@ public enum WinPopupType
 /// </summary>
 public static class InitDataConverter
 {
+    // Used only if the init omits creditDivisor. Total bet = selected bet x 50, which matches every
+    // captured balance: each non-winning spin at bet 0.01 cost exactly 0.50.
+    private const int FallbackBetMultiplier = 50;
+
     internal static GameConfig ConvertToGameConfig(InitData serverData)
     {
         var gameData = serverData?.gameData;
@@ -432,18 +516,28 @@ public static class InitDataConverter
             ? gameData.lines[0].Count
             : 5;
 
-        int lineCount = gameData?.lines?.Count ?? 0;
-        int totalLines = (gameData != null && gameData.totalLines > 0) ? gameData.totalLines : lineCount;
+        int betMultiplier = gameData != null && gameData.creditDivisor > 0 ? gameData.creditDivisor : FallbackBetMultiplier;
+        if (gameData == null || gameData.creditDivisor <= 0)
+        {
+            UnityEngine.Debug.LogError($"[InitDataConverter] Init carried no creditDivisor — total bet assumed to be bet x {FallbackBetMultiplier}.");
+        }
 
         var config = new GameConfig
         {
             reelCount = reelCount,
             rowCount = 3,
-            activeLine = totalLines,
-            paylines = gameData?.lines,
+            activeLine = betMultiplier,
             availableBets = gameData?.bets,
-            symbols = new List<SymbolInfo>()
+            symbols = new List<SymbolInfo>(),
+            wheelSlices = ConvertWheelSlices(serverData?.features?.genieWheel),
+            wildMultipliers = serverData?.features?.genieWild?.multipliers ?? new List<int>(),
+            maxTotalFreeGames = serverData?.features?.freeGames?.maxTotalFreeGames ?? 0
         };
+
+        if (config.availableBets == null || config.availableBets.Count == 0)
+        {
+            UnityEngine.Debug.LogError("[InitDataConverter] Init carried no bet levels — the bet controls will do nothing.");
+        }
 
         if (serverSymbols == null)
         {
@@ -455,59 +549,84 @@ public static class InitDataConverter
         {
             if (serverSymbol == null) continue;
 
+            // The role comes from "group". Names are Genie and Lamp here, so the old name matching
+            // against "Wild" and "Scatter" would have found neither.
+            string group = (serverSymbol.group ?? string.Empty).Trim().ToLowerInvariant();
+
+            var payout = serverSymbol.payout ?? new List<double>();
+
+            // The wire runs 3-of-a-kind first; the client works descending from a full-reel match,
+            // so reversing here leaves every consumer of multipliers as it was.
+            var multipliers = new List<double>(payout);
+            multipliers.Reverse();
+
             var symbolInfo = new SymbolInfo
             {
                 id = serverSymbol.id,
                 name = serverSymbol.name,
-                displayName = string.IsNullOrEmpty(serverSymbol.displayName) ? serverSymbol.name : serverSymbol.displayName,
-                multipliers = serverSymbol.multiplier ?? new List<double>(),
-                scatterMultipliers = serverSymbol.scatterMultiplier ?? new List<double>(),
-                isSpecial = serverSymbol.isSpecialSymbol
+                displayName = serverSymbol.name,
+                multipliers = multipliers,
+                scatterMultipliers = new List<double>(),
+                isWild = group == "wild",
+                isScatter = group == "scatter",
+                minMatch = payout.Count > 0 ? serverSymbol.minMatch : 0
             };
+            symbolInfo.isSpecial = symbolInfo.isWild || symbolInfo.isScatter;
 
-            // -- STOPGAP ---------------------------------------------------------------------
-            // The init flags a symbol as special but never says which kind, so the four roles are
-            // told apart by matching the server's stable "name". This breaks silently if a symbol
-            // is renamed, reordered or localized. Swap this block for serverSymbol.type once the
-            // backend sends it — those values already exist in Assets/Scripts/Config/gdn_config.json.
-            // Tracked in TODO.md under "Pending backend".
-            switch ((serverSymbol.name ?? string.Empty).Trim().ToLowerInvariant())
+            // An unknown group means the backend added a role this client has never heard of.
+            if (group != "high" && group != "low" && !symbolInfo.isSpecial)
             {
-                case "wild": symbolInfo.isWild = true; break;
-                case "scatter": symbolInfo.isScatter = true; break;
-                case "orb": symbolInfo.isOrb = true; break;
-                case "mystery": symbolInfo.isMystery = true; break;
+                UnityEngine.Debug.LogError($"[InitDataConverter] Symbol id {symbolInfo.id} (name '{symbolInfo.name}') has unrecognised group '{serverSymbol.group}' — it will be treated as an ordinary symbol.");
             }
-            // --------------------------------------------------------------------------------
-
-            // A symbol the server calls special that we failed to place is worth shouting about:
-            // it means a rename has already happened and the stopgap above has gone stale.
-            if (symbolInfo.isSpecial && !symbolInfo.isWild && !symbolInfo.isScatter && !symbolInfo.isOrb && !symbolInfo.isMystery)
-            {
-                UnityEngine.Debug.LogError($"[InitDataConverter] Symbol id {symbolInfo.id} (name '{symbolInfo.name}') is flagged special but matches no known role. The name-matching stopgap needs updating.");
-            }
-
-            symbolInfo.minMatch = DeriveMinMatch(symbolInfo.multipliers.Count, reelCount);
 
             config.symbols.Add(symbolInfo);
 
             if (symbolInfo.isWild) config.wildSymbolId = symbolInfo.id;
             if (symbolInfo.isScatter) config.scatterSymbolId = symbolInfo.id;
-            if (symbolInfo.isOrb) config.orbSymbolId = symbolInfo.id;
-            if (symbolInfo.isMystery) config.mysterySymbolId = symbolInfo.id;
         }
 
         return config;
     }
 
-    // The paytable runs descending from a full-reel match, so its length says how far down the
-    // match counts go: reelCount - (tierCount - 1). Verified against a live spin — Ace's
-    // [75, 20, 5] paid 20 for four-of-a-kind, so index 1 is 4-of-a-kind and the table bottoms out
-    // at 3. Warriors' 4-entry table is the only one reaching 2.
-    private static int DeriveMinMatch(int tierCount, int reelCount)
+    // Sorted by sliceIndex so a slice's place in the list is its index, whatever order the server
+    // sent them in. Empty and loud when the init carried none: the wheel cannot be drawn without them.
+    private static List<WheelSlice> ConvertWheelSlices(ServerGenieWheelFeature wheel)
     {
-        if (tierCount <= 0) return 0;
-        return Math.Max(1, reelCount - tierCount + 1);
+        var slices = new List<WheelSlice>();
+
+        if (wheel?.segments == null || wheel.segments.Count == 0)
+        {
+            UnityEngine.Debug.LogError("[InitDataConverter] Init carried no Genie Wheel slices — the wheel cannot be drawn. Check the array's name in features.genieWheel.");
+            return slices;
+        }
+
+        foreach (var serverSlice in wheel.segments)
+        {
+            if (serverSlice == null) continue;
+
+            slices.Add(new WheelSlice
+            {
+                sliceIndex = serverSlice.sliceIndex,
+                type = ParseSliceType(serverSlice.type, serverSlice.freeGames, "wheel slice " + serverSlice.sliceIndex),
+                multiplier = serverSlice.multiplier,
+                freeGames = serverSlice.freeGames
+            });
+        }
+
+        slices.Sort((a, b) => a.sliceIndex.CompareTo(b.sliceIndex));
+        return slices;
+    }
+
+    private static WheelSliceType ParseSliceType(string type, int freeGames, string source)
+    {
+        switch ((type ?? string.Empty).Trim().ToUpperInvariant())
+        {
+            case "MULTIPLIER": return WheelSliceType.Multiplier;
+            case "FREE_GAMES": return WheelSliceType.FreeGames;
+        }
+
+        UnityEngine.Debug.LogError($"[InitDataConverter] {source} has unrecognised type '{type}' — read as {(freeGames > 0 ? "free games" : "a multiplier")} from its figures.");
+        return freeGames > 0 ? WheelSliceType.FreeGames : WheelSliceType.Multiplier;
     }
 
     internal static PlayerData ConvertToPlayerData(ServerPlayer serverPlayer, int defaultBetIndex = 0)
@@ -528,17 +647,18 @@ public static class InitDataConverter
     {
         var payload = serverResponse?.payload;
 
-        // currentWinning is the server's grand total for the spin and passes straight through —
-        // scatterWin and any other component is already inside it, so nothing is summed here.
-        // Verified against a live spin: balance moved by exactly (win - totalBet).
-        double winAmountVal = payload?.currentWinning ?? 0;
-        double newBalance = serverResponse?.player?.balance ?? CalculateNewBalance(currentBalance, winAmountVal);
+        // grandTotalWin is the spin's total — ways and wheel prize together — and passes straight
+        // through. payload.winAmount is the ways subtotal only, so it is kept separately and never
+        // used as the figure to show. Nothing is summed here.
+        double totalWin = payload?.grandTotalWin ?? 0;
+        double newBalance = serverResponse?.player?.balance ?? CalculateNewBalance(currentBalance, totalWin);
 
         return new SpinResult
         {
             resultMatrix = ConvertMatrixToColumns(serverResponse?.matrix, gameConfig),
-            winAmount = winAmountVal,
-            winLines = ConvertLineWins(payload?.lineWins, gameConfig),
+            winAmount = totalWin,
+            waysWinAmount = payload?.winAmount ?? 0,
+            winLines = ConvertWaysWins(payload?.waysWins, gameConfig),
 
             playerData = new PlayerData
             {
@@ -546,98 +666,85 @@ public static class InitDataConverter
                 currentBetIndex = 0
             },
 
-            freeGame = ConvertFreeGame(serverResponse?.features?.freeGame),
-            mysteryPositions = ConvertMysteryPositions(serverResponse?.cellMetadata, gameConfig),
-            holdAndSpin = ConvertHoldAndSpin(serverResponse?.features?.holdAndSpin, serverResponse?.payload?.orbPrizeMap, gameConfig)
+            freeGame = ConvertFreeGame(payload?.freeGames, payload?.genieWheel),
+            genieMultipliers = ConvertGenieMultipliers(payload?.genieMultipliers, gameConfig),
+            genieWheel = ConvertGenieWheel(payload?.genieWheel),
+
+            // Transitional: see SpinResult. Empty rather than null so the old consumers need no guards.
+            mysteryPositions = new List<int>(),
+            holdAndSpin = new HoldAndSpinData { orbPrizes = new Dictionary<int, double>() }
         };
     }
 
     // Never returns null, so the controller can read it without guarding every access. A missing
     // block is indistinguishable from "not in a round", which is the correct reading either way.
-    private static FreeGameData ConvertFreeGame(ServerFreeGameResult serverFreeGame)
+    //
+    // Maps the wire's post-spin fields onto the per-spin meanings the controller was built on:
+    //  - isFreeGame is "played > 0". The trigger spin reports 0 and every free spin 1 or more, the
+    //    last one included — unlike inFreeGames, which turns false on that last spin.
+    //  - spinsAwarded is "the wheel landed on a free-games slice". The wire's freeGames.triggered
+    //    stays true for the whole round, so it cannot say which spin did the awarding.
+    private static FreeGameData ConvertFreeGame(ServerFreeGamesResult serverFreeGames, ServerGenieWheelResult wheel)
     {
-        if (serverFreeGame == null) return new FreeGameData();
+        if (serverFreeGames == null) return new FreeGameData();
+
+        bool wheelAwardedGames = wheel != null && wheel.triggered
+            && wheel.result != null && wheel.result.freeGamesAwarded > 0;
 
         return new FreeGameData
         {
-            isFreeGame = serverFreeGame.isFreeGame,
-            spinsRemaining = serverFreeGame.freeGameCount,
-            spinsAwarded = serverFreeGame.freeGameAdded,
-            roundWin = serverFreeGame.totalRoundWin
+            isFreeGame = serverFreeGames.played > 0,
+            spinsRemaining = serverFreeGames.remaining,
+            spinsAwarded = wheelAwardedGames,
+            roundWin = serverFreeGames.totalFreeGamesWin
         };
     }
 
-    /// <summary>
-    /// Turns cellMetadata into the flat cell indices that landed as a Mystery.
-    ///
-    /// Only the KEYS are read. The values encode the revealed symbol as "mystery_" + its display
-    /// name ("mystery_J", "mystery_10", "mystery_Mystery"), which would mean splitting on an
-    /// underscore and matching a name — brittle, and pointless: matrix already carries the revealed
-    /// symbol at that same cell. So the view draws a Mystery over a cell that is already correct
-    /// underneath, and uncovering it is the reveal.
-    ///
-    /// Keys are "row:col" in the server's row-major space, confirmed against live data — a key of
-    /// "1:4" only lands in range read that way on a 3-row matrix.
-    /// </summary>
-    private static List<int> ConvertMysteryPositions(Dictionary<string, string> cellMetadata, GameConfig gameConfig)
+    // A wheel that reports itself triggered with no result is treated as not triggered: there is
+    // nothing to animate to, and pretending otherwise would stall the round waiting for a landing.
+    private static GenieWheelData ConvertGenieWheel(ServerGenieWheelResult serverWheel)
     {
-        var positions = new List<int>();
-        if (cellMetadata == null || cellMetadata.Count == 0) return positions;
+        var data = new GenieWheelData();
 
-        foreach (var entry in cellMetadata)
+        if (serverWheel == null || !serverWheel.triggered) return data;
+
+        if (serverWheel.result == null)
         {
-            if (TryParseCellKey(entry.Key, gameConfig, "cellMetadata", out int flatIndex))
-            {
-                positions.Add(flatIndex);
-            }
+            UnityEngine.Debug.LogError("[InitDataConverter] genieWheel reported triggered but carried no result — wheel skipped.");
+            return data;
         }
 
-        return positions;
-    }
-
-    /// <summary>
-    /// Turns payload.orbPrizeMap into flat cell index -> cash prize, and folds in the round state.
-    ///
-    /// Deliberately ignores features.holdAndSpin's orbCount, newOrbCount and heldPositions. The
-    /// prize map's key set is the same cell set during a round, and it is the only one of the four
-    /// that has never been observed stale — orbCount and heldPositions both survive a round's end,
-    /// and newOrbCount is 0 on the triggering spin despite every Orb there being new. Working from
-    /// the map and diffing against what is already drawn makes all three traps unreachable.
-    /// </summary>
-    private static HoldAndSpinData ConvertHoldAndSpin(ServerHoldAndSpinResult serverHoldAndSpin, Dictionary<string, double> orbPrizeMap, GameConfig gameConfig)
-    {
-        var data = new HoldAndSpinData
-        {
-            orbPrizes = new Dictionary<int, double>()
-        };
-
-        if (serverHoldAndSpin != null)
-        {
-            data.active = serverHoldAndSpin.active;
-            data.triggered = serverHoldAndSpin.triggered;
-            data.spinsRemaining = serverHoldAndSpin.spinsRemaining;
-            data.roundWin = serverHoldAndSpin.totalOrbPayout;
-        }
-
-        if (orbPrizeMap != null)
-        {
-            foreach (var entry in orbPrizeMap)
-            {
-                if (TryParseCellKey(entry.Key, gameConfig, "orbPrizeMap", out int flatIndex))
-                {
-                    data.orbPrizes[flatIndex] = entry.Value;
-                }
-            }
-        }
-
+        var result = serverWheel.result;
+        data.triggered = true;
+        data.sliceIndex = result.sliceIndex;
+        data.type = ParseSliceType(result.type, result.freeGamesAwarded, "genieWheel result");
+        data.multiplier = result.multiplierAwarded;
+        data.freeGames = result.freeGamesAwarded;
+        data.winAmount = result.winInCash;
         return data;
     }
 
+    // Turns payload.genieMultipliers into flat cell index -> multiplier. One bad key is skipped
+    // rather than costing the whole spin.
+    private static Dictionary<int, int> ConvertGenieMultipliers(Dictionary<string, int> genieMultipliers, GameConfig gameConfig)
+    {
+        var result = new Dictionary<int, int>();
+        if (genieMultipliers == null) return result;
+
+        foreach (var entry in genieMultipliers)
+        {
+            if (TryParseCellKey(entry.Key, gameConfig, "genieMultipliers", out int flatIndex))
+            {
+                result[flatIndex] = entry.Value;
+            }
+        }
+
+        return result;
+    }
+
     /// <summary>
-    /// Reads a "row:col" cell key into a flat index (row * reelCount + col) — the same space
-    /// WinLine.positions uses. Shared by every per-cell map the server sends, which all use this
-    /// key format in the server's row-major space. Confirmed against live data: a key of "1:4"
-    /// only lands in range read that way on a 3-row matrix.
+    /// Reads a "row,col" cell key into a flat index (row * reelCount + col). Confirmed against live
+    /// data: a key of "0,3" lands on a Genie in the matrix only when read as row 0, column 3.
     ///
     /// Returns false and logs for anything malformed or out of range, so one bad cell is skipped
     /// rather than costing the whole spin.
@@ -647,13 +754,10 @@ public static class InitDataConverter
         flatIndex = -1;
         if (string.IsNullOrEmpty(key)) return false;
 
-        int reelCount = gameConfig != null ? gameConfig.reelCount : 5;
-        int rowCount = gameConfig != null ? gameConfig.rowCount : 3;
-
-        int separator = key.IndexOf(':');
+        int separator = key.IndexOf(',');
         if (separator <= 0 || separator >= key.Length - 1)
         {
-            UnityEngine.Debug.LogError($"[InitDataConverter] {source} key '{key}' is not in the expected row:col form — cell skipped.");
+            UnityEngine.Debug.LogError($"[InitDataConverter] {source} key '{key}' is not in the expected row,col form — cell skipped.");
             return false;
         }
 
@@ -664,9 +768,21 @@ public static class InitDataConverter
             return false;
         }
 
+        return TryGetFlatIndex(row, col, gameConfig, $"{source} key '{key}'", out flatIndex);
+    }
+
+    // The one place a row and column become a flat index, so the bounds check cannot drift between
+    // the callers that read keys and the ones that read {row, col} objects.
+    private static bool TryGetFlatIndex(int row, int col, GameConfig gameConfig, string source, out int flatIndex)
+    {
+        flatIndex = -1;
+
+        int reelCount = gameConfig != null ? gameConfig.reelCount : 5;
+        int rowCount = gameConfig != null ? gameConfig.rowCount : 3;
+
         if (row < 0 || row >= rowCount || col < 0 || col >= reelCount)
         {
-            UnityEngine.Debug.LogError($"[InitDataConverter] {source} key '{key}' is outside the {rowCount}x{reelCount} grid — cell skipped.");
+            UnityEngine.Debug.LogError($"[InitDataConverter] {source} is outside the {rowCount}x{reelCount} grid — cell skipped.");
             return false;
         }
 
@@ -715,52 +831,41 @@ public static class InitDataConverter
         return matrix;
     }
 
-    // The server names the reels a win covers; the row each of those reels landed on lives in the
-    // payline definition. Resolving that here rather than in SlotView keeps payline knowledge in
-    // the model and hands the view the same flat indices it already consumes.
-    private static List<WinLine> ConvertLineWins(List<ServerLineWin> lineWins, GameConfig gameConfig)
+    // One WinLine per winning symbol. The server already says which cells take part and which symbol
+    // paid, so unlike the payline games nothing is rebuilt from a line table.
+    private static List<WinLine> ConvertWaysWins(List<ServerWaysWin> waysWins, GameConfig gameConfig)
     {
         var winLines = new List<WinLine>();
-        if (lineWins == null) return winLines;
+        if (waysWins == null) return winLines;
 
-        int reelCount = gameConfig != null ? gameConfig.reelCount : 5;
-        int rowCount = gameConfig != null ? gameConfig.rowCount : 3;
-        var paylines = gameConfig?.paylines;
-
-        foreach (var lineWin in lineWins)
+        for (int i = 0; i < waysWins.Count; i++)
         {
-            if (lineWin == null) continue;
-
-            List<int> payline = (paylines != null && lineWin.lineIndex >= 0 && lineWin.lineIndex < paylines.Count)
-                ? paylines[lineWin.lineIndex]
-                : null;
-
-            if (payline == null)
-            {
-                UnityEngine.Debug.LogError($"[InitDataConverter] Win references payline {lineWin.lineIndex}, outside the lines sent at init — win not shown.");
-                continue;
-            }
+            var waysWin = waysWins[i];
+            if (waysWin == null) continue;
 
             var flatPositions = new List<int>();
-            if (lineWin.positions != null)
+            if (waysWin.matchedPositions != null)
             {
-                foreach (int reelIndex in lineWin.positions)
+                foreach (var cell in waysWin.matchedPositions)
                 {
-                    if (reelIndex < 0 || reelIndex >= reelCount || reelIndex >= payline.Count) continue;
+                    if (cell == null) continue;
 
-                    int row = payline[reelIndex];
-                    if (row < 0 || row >= rowCount) continue;
-
-                    flatPositions.Add(row * reelCount + reelIndex);
+                    if (TryGetFlatIndex(cell.row, cell.col, gameConfig, $"waysWins[{i}] cell ({cell.row},{cell.col})", out int flatIndex))
+                    {
+                        flatPositions.Add(flatIndex);
+                    }
                 }
             }
 
             winLines.Add(new WinLine
             {
-                lineId = lineWin.lineIndex,
-                symbolId = -1,
+                lineId = i,
+                symbolId = waysWin.symbolId,
                 positions = flatPositions,
-                winAmount = lineWin.win
+                winAmount = waysWin.winInCash,
+                matchCount = waysWin.matchCount,
+                waysCount = waysWin.waysCount,
+                multiplier = Math.Max(1, waysWin.genieMultiplierProduct)
             });
         }
 
