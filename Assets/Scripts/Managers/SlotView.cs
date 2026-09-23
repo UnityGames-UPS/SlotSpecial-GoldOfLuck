@@ -28,6 +28,25 @@ public class SlotView : MonoBehaviour
     [SerializeField] private Sprite spriteGenie;              // ID: 8  (wild — reels 2-4 only, carries a multiplier)
     [SerializeField] private Sprite spriteLamp;               // ID: 9  (scatter — reels 3-5 only, triggers the Genie Wheel)
 
+    // The Genie drawn with its multiplier, keyed by the VALUE — deliberately NOT part of the
+    // id-keyed table above, and not in BuildSymbolSpriteArray's symbolSprites.
+    //
+    // Every Genie on the board is symbol id 8. The multiplier is not part of the symbol: the server
+    // sends it per CELL, in payload.genieMultipliers, so which of these is drawn depends on where
+    // the Genie landed rather than on what it is. That makes this a value-keyed lookup done at draw
+    // time, and it is why an id-keyed array cannot express it.
+    //
+    // Each is optional. An unassigned value falls back to the plain spriteGenie above, so a partial
+    // art drop still runs — and so do the places that legitimately have no multiplier to show: the
+    // scroll buffer, the pre-spin board, and any Genie the server never attached a value to.
+    [Header("Genie Multiplier Sprites - Keyed by VALUE, not by symbol id")]
+    [Tooltip("The Genie drawn with x2. Empty = a x2 Genie falls back to the plain Genie sprite.")]
+    [SerializeField] private Sprite spriteGenie2;
+    [Tooltip("The Genie drawn with x3. Empty = a x3 Genie falls back to the plain Genie sprite.")]
+    [SerializeField] private Sprite spriteGenie3;
+    [Tooltip("The Genie drawn with x4. Empty = a x4 Genie falls back to the plain Genie sprite.")]
+    [SerializeField] private Sprite spriteGenie4;
+
     // Deliberately NOT part of the id-keyed table above and NOT in BuildSymbolSpriteArray: this has
     // no symbol id, the server can never send it, and it is never a spin result. It is the empty
     // cell backing, used only where something has to occupy a slot without being a symbol — today
@@ -89,6 +108,11 @@ public class SlotView : MonoBehaviour
 
     // Internal array built from named sprites
     private Sprite[] symbolSprites;
+
+    // Multiplier value -> the Genie sprite drawn for it, built from the three fields above. Values
+    // left unassigned are absent rather than stored as null, so a miss and an unwired entry are the
+    // same case and both fall back to the plain Genie.
+    private Dictionary<int, Sprite> genieMultiplierSprites;
 
     [Header("Win Animation Sprite Arrays")]
     [Tooltip("Optional per-symbol win-animation frame sequences. Leave any empty until real art exists — animation playback already no-ops safely on an empty list.")]
@@ -312,6 +336,12 @@ public class SlotView : MonoBehaviour
     // tween, by which point the result may already have been consumed and cleared.
     private readonly Dictionary<int, double> pendingOrbPrizes = new Dictionary<int, double>();
 
+    // This spin's Genies and the multiplier each one carries, as flat index -> value. Captured when
+    // the reels are told to stop, for exactly the reason pendingOrbPrizes is: the landing write runs
+    // per reel off each one's own stop, and by the time the last reel lands the controller may have
+    // already consumed and cleared lastResult. Reading it at draw time was a race that field lost.
+    private readonly Dictionary<int, int> landedGenieMultipliers = new Dictionary<int, int>();
+
     // Ids the scroll buffer is allowed to pick from — every symbol except Orb and Mystery. Neither
     // should ever appear unless the backend actually placed it there: an Orb always needs a real
     // prize value attached, and Mystery has no meaning outside a reveal, so seeing either as random
@@ -508,6 +538,12 @@ public class SlotView : MonoBehaviour
         symbolSprites[8] = spriteGenie;
         symbolSprites[9] = spriteLamp;
 
+        // Value-keyed, so built separately from the id table: see the field declarations.
+        genieMultiplierSprites = new Dictionary<int, Sprite>();
+        if (spriteGenie2 != null) genieMultiplierSprites[2] = spriteGenie2;
+        if (spriteGenie3 != null) genieMultiplierSprites[3] = spriteGenie3;
+        if (spriteGenie4 != null) genieMultiplierSprites[4] = spriteGenie4;
+
         // Validate
         for (int i = 0; i < symbolSprites.Length; i++)
         {
@@ -641,7 +677,7 @@ public class SlotView : MonoBehaviour
                     symbolId = mysteryId;
                 }
 
-                ApplySymbol(reel.displayImages[row], symbolId, manageRaycast: true);
+                ApplySymbol(reel.displayImages[row], symbolId, manageRaycast: true, flatIndex: row * ReelCount + columnIndex);
             }
         }
     }
@@ -655,7 +691,10 @@ public class SlotView : MonoBehaviour
             : DefaultSymbolAnimationSpeed;
     }
 
-    private Sprite GetSymbolSprite(int symbolId)
+    // flatIndex is the cell being drawn, or -1 for a write with no cell behind it (the scroll
+    // buffer, a Hold & Spin filler). It exists only for the Genie, whose art depends on the
+    // multiplier the server attached to that cell rather than on its symbol id.
+    private Sprite GetSymbolSprite(int symbolId, int flatIndex = -1)
     {
         // Validate symbolId range (0..SymbolCount-1)
         if (symbolId < 0 || symbolId >= symbolSprites.Length)
@@ -663,6 +702,12 @@ public class SlotView : MonoBehaviour
             Debug.LogWarning($"[SlotView] Invalid symbolId {symbolId}, using default sprite 0. Total sprites: {symbolSprites.Length}");
             return symbolSprites[0];
         }
+
+        // Ahead of the id-keyed table, because every Genie shares one id and only the cell says
+        // which multiplier it carries. Returns null for anything that is not a numbered Genie, so
+        // the plain art below stays the default for every other case.
+        Sprite genieSprite = GetGenieMultiplierSprite(symbolId, flatIndex);
+        if (genieSprite != null) return genieSprite;
 
         if (symbolSprites[symbolId] == null)
         {
@@ -673,16 +718,58 @@ public class SlotView : MonoBehaviour
         return symbolSprites[symbolId];
     }
 
+    /// <summary>
+    /// The numbered Genie sprite for one cell, or null when this is not one.
+    ///
+    /// Null is returned — rather than the plain Genie — so the caller can tell "no variant applies"
+    /// from "this is the variant", and every non-Genie write keeps going through the ordinary
+    /// id-keyed path untouched. Null covers four cases, all of them normal: the symbol is not the
+    /// Genie, the write has no cell (flatIndex -1), the server attached no multiplier to that cell,
+    /// or that multiplier's art was never wired.
+    /// </summary>
+    private Sprite GetGenieMultiplierSprite(int symbolId, int flatIndex)
+    {
+        if (flatIndex < 0 || genieMultiplierSprites == null || genieMultiplierSprites.Count == 0) return null;
+
+        // No literal fallback: -1 before init, and -1 can never match a real symbol id.
+        int wildId = WildSymbolId;
+        if (wildId < 0 || symbolId != wildId) return null;
+
+        if (!landedGenieMultipliers.TryGetValue(flatIndex, out int multiplier)) return null;
+
+        return genieMultiplierSprites.TryGetValue(multiplier, out Sprite sprite) ? sprite : null;
+    }
+
+    /// <summary>
+    /// Refreshes landedGenieMultipliers from the spin about to be drawn.
+    ///
+    /// Called from every stop path, the two no-reel early-outs included, so a Genie can never be
+    /// drawn carrying the previous spin's number. Clearing unconditionally is the point: a spin with
+    /// no Genie on the board has to wipe the last one's, not leave it behind.
+    /// </summary>
+    private void CaptureLandedGenieMultipliers()
+    {
+        landedGenieMultipliers.Clear();
+
+        var landed = gameManager?.lastResult?.genieMultipliers;
+        if (landed == null) return;
+
+        foreach (var entry in landed) landedGenieMultipliers[entry.Key] = entry.Value;
+    }
+
     // Single place that puts a symbol onto an icon. Sprite and size are set together on purpose:
     // the Bonus symbol's art is drawn at a different scale to the rest, so it needs a larger rect.
     // Because every write goes through here and always sets one size or the other, an icon that
     // showed a Bonus is snapped back to normal as soon as it's given any other symbol — no reset
     // pass to maintain and no way for an icon to get stuck oversized.
-    private void ApplySymbol(Image image, int symbolId, bool manageRaycast = false)
+    //
+    // flatIndex is passed only by the callers that know which cell they are drawing, and only the
+    // Genie reads it — see GetGenieMultiplierSprite. Left at -1 the behaviour is exactly as before.
+    private void ApplySymbol(Image image, int symbolId, bool manageRaycast = false, int flatIndex = -1)
     {
         if (image == null) return;
 
-        image.sprite = GetSymbolSprite(symbolId);
+        image.sprite = GetSymbolSprite(symbolId, flatIndex);
 
         // Sizing is art-driven, not role-driven: a few symbols are drawn larger than the pitch and
         // the rest are not, which is why this reads an id-keyed map rather than keying off
@@ -861,6 +948,7 @@ public class SlotView : MonoBehaviour
             // No reveal runs on this path, so no cell should be held back as a Mystery — and a
             // stale set from a previous spin would draw one over an unrelated symbol.
             mysteryCells.Clear();
+            CaptureLandedGenieMultipliers();
             for (int col = 0; col < ReelCount; col++)
             {
                 SetReelSymbols(col, resultMatrix[col], false);
@@ -888,6 +976,10 @@ public class SlotView : MonoBehaviour
         {
             foreach (int flatIndex in landedMysteries) mysteryCells.Add(flatIndex);
         }
+
+        // Captured here too, and for the same reason: each reel's landing write picks its Genie art
+        // out of this, and the last reel lands on the same frame this sequence reports completion.
+        CaptureLandedGenieMultipliers();
 
         // Captured for the same reason, and one more: the Orb draw happens on each reel's landing
         // TWEEN completing, which for the last reel lands on the same frame as this sequence's own
@@ -1134,6 +1226,7 @@ public class SlotView : MonoBehaviour
             currentDisplayMatrix = resultMatrix;
             // Same reasoning as StopSpin's early-out: no reveal on this path, so no Mystery override.
             mysteryCells.Clear();
+            CaptureLandedGenieMultipliers();
             for (int col = 0; col < ReelCount; col++)
             {
                 if (col < reelTransforms.Length)
@@ -1230,7 +1323,7 @@ public class SlotView : MonoBehaviour
         // resting icon shows through as a ghost, and an oversized neighbour can poke into the cell.
         // HideWinSlots puts every icon back when the layer comes down.
         symbolImage.DOKill();
-        ApplySymbol(symbolImage, symbolId);
+        ApplySymbol(symbolImage, symbolId, flatIndex: row * ReelCount + column);
         symbolImage.transform.localScale = Vector3.one;
         Color c = symbolImage.color;
         symbolImage.color = new Color(c.r, c.g, c.b, 1f);
@@ -1447,7 +1540,7 @@ public class SlotView : MonoBehaviour
             if (reel == null || reel.displayImages == null || row >= reel.displayImages.Count) continue;
             if (reel.displayImages[row] == null) continue;
 
-            ApplySymbol(reel.displayImages[row], currentDisplayMatrix[col][row], manageRaycast: true);
+            ApplySymbol(reel.displayImages[row], currentDisplayMatrix[col][row], manageRaycast: true, flatIndex: flatIndex);
         }
 
         // The override has served its purpose: any later write this spin should use the real
@@ -2462,7 +2555,7 @@ public class SlotView : MonoBehaviour
             // DOKill above means that fade's completion will never run to put it back.
             ReclaimAnimSlot(slot);
 
-            ApplySymbol(slotImage, symbolId);
+            ApplySymbol(slotImage, symbolId, flatIndex: flatIndex);
 
             // AFTER ApplySymbol, which stamps the single-symbol size — reversing these would flatten
             // the stack straight back to one cell.
