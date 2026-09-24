@@ -294,8 +294,8 @@ public class SocketIOManager : MonoBehaviour
                 gameConfig.rowCount,
                 gameConfig.reelCount,
                 gameConfig.symbols != null ? gameConfig.symbols.Count : 0,
-                gameConfig.orbSymbolId,
-                gameConfig.mysterySymbolId);
+                gameConfig.wildSymbolId,
+                gameConfig.scatterSymbolId);
 
             isInitialized = true;
 
@@ -588,10 +588,11 @@ public class SocketIOManager : MonoBehaviour
 
     #region Spin Request
 
-    // isFreeSpin is still accepted so GameManager's call site is untouched, but it is no longer
-    // sent: the server tracks free-spin state itself and reports it back on the response. The
-    // parameter can come out when the free-games work lands.
-    internal void SendSpinRequest(int betIndex, bool isFreeSpin)
+    // betIndex is the only thing the server needs. There is deliberately no free-spin flag: the
+    // server tracks round state itself and reports it back on the response, so a client-side idea of
+    // whether this spin is free has no business being sent. An isFreeSpin parameter was carried here
+    // unused through the conversion and has now been dropped.
+    internal void SendSpinRequest(int betIndex)
     {
         Debug.Log($"[SocketIO] Spin request: betIndex={betIndex}");
 
@@ -674,22 +675,26 @@ public class SocketIOManager : MonoBehaviour
     }
 
     #endregion
-    // Pre-spin placeholder matrix (before any real result exists). Every cell gets a random symbol
-    // now: Golden Dynasty has no blank/filler symbol, so the alternating blank-row pattern this
-    // used to build (which existed to space symbols out in Sizzling 7s' padded display block) would
-    // just scatter Drums across the idle grid. Symbol count comes from the server's own table
-    // rather than a literal, so it can't drift when the symbol set changes again.
+    // Pre-spin placeholder matrix (before any real result exists). Every cell gets a random symbol:
+    // this game has no blank/filler symbol, so the alternating blank-row pattern this used to build
+    // (which existed to space symbols out in Sizzling 7s' padded display block) would just scatter
+    // ordinary symbols across the idle grid. Symbol count comes from the server's own table rather
+    // than a literal, so it can't drift when the symbol set changes again.
     //
-    // Orb and Mystery are excluded from this random pool. Both are only ever meant to appear when
-    // the backend actually places them there — an Orb always needs a real prize value attached, and
-    // Mystery has no meaning outside a reveal — so neither should turn up in a placeholder nobody
-    // asked for.
-    private List<List<int>> GenerateRandomMatrix(int rowCount, int reelCount, int symbolCount, int orbSymbolId, int mysterySymbolId)
+    // The two excluded ids are the SPECIALS, because a special is only ever meant to appear where
+    // the backend actually placed it. Both reasons are live in this game:
+    //   - the wild carries a per-cell multiplier that only arrives with a spin response, so a
+    //     placeholder one would draw without the number that gives it meaning;
+    //   - the scatter has a trigger condition, so a random placeholder can show what looks like a
+    //     trigger sitting on an idle board.
+    // Which ids those are comes from the init, so this needs no changing when the symbol set does.
+    // Pass -1 for either to leave it in the pool.
+    private List<List<int>> GenerateRandomMatrix(int rowCount, int reelCount, int symbolCount, int wildSymbolId, int scatterSymbolId)
     {
         var allowedSymbolIds = new List<int>(symbolCount);
         for (int id = 0; id < symbolCount; id++)
         {
-            if (id == orbSymbolId || id == mysterySymbolId) continue;
+            if (id == wildSymbolId || id == scatterSymbolId) continue;
             allowedSymbolIds.Add(id);
         }
 

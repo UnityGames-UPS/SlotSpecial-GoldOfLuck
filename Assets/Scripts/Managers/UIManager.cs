@@ -12,7 +12,6 @@ public class UIManager : MonoBehaviour
     [SerializeField] private PopupManager popupManager;
     [SerializeField] private JSFunctCalls jsFunctCalls;
     [SerializeField] private FreeGameView freeGameView;
-    [SerializeField] private HoldAndSpinView holdAndSpinView;
 
     [Header("Loading & Intro")]
     [SerializeField] private GameObject gameScreen;
@@ -492,10 +491,10 @@ public class UIManager : MonoBehaviour
     {
         AudioManager.Instance?.PlaySpinStart();
 
-        // Both feature rounds hold the button in an explicit mode, so this only decides the
-        // interactable flag. It must stay false through a round: Hold & Spin in particular would
-        // otherwise re-enable its own Start button on every respin.
-        if (gameManager.isInFreeSpins || gameManager.isInHoldAndSpin)
+        // Free games hold the button in an explicit mode, so this only decides the interactable
+        // flag. It must stay false for the whole round, or a spin inside it would re-enable a button
+        // the round has deliberately taken over.
+        if (gameManager.isInFreeSpins)
         {
             SetSpinStopButtonStates(isSpinningState: true, isInteractable: false);
         }
@@ -532,16 +531,16 @@ public class UIManager : MonoBehaviour
     /// <summary>
     /// What the win box should read for this spin.
     ///
-    /// Free games show the round's running total, which GameManager accumulates — the server sends
-    /// only this spin's win. Hold & Spin shows nothing at all: the box holds "GOOD LUCK" for the
-    /// whole round and the Winner panel owns the total. That has to survive the payout spin too,
-    /// which arrives carrying the full round win in winAmount — writing it here would flash the
-    /// figure in the corner a moment before the panel counts it up properly.
+    /// Free games show the round's running total, which GameManager tracks from the server's
+    /// per-round figure rather than this spin's own win.
+    ///
+    /// Worth remembering when a feature owns its own payout presentation: returning 0 here is how a
+    /// round keeps the win box quiet, so a total it means to count up itself cannot flash in the
+    /// corner a moment beforehand.
     /// </summary>
     private double GetDisplayWin(SpinResult result)
     {
         if (gameManager == null) return result.winAmount;
-        if (gameManager.isInHoldAndSpin) return 0;
         return gameManager.isInFreeSpins ? gameManager.freeSpinsRoundWin : result.winAmount;
     }
 
@@ -557,7 +556,7 @@ public class UIManager : MonoBehaviour
         {
             SetSpinStopButtonStates(isSpinningState: true, isInteractable: true);
         }
-        else if (gameManager.isInFreeSpins || gameManager.isInHoldAndSpin)
+        else if (gameManager.isInFreeSpins)
         {
             SetSpinStopButtonStates(isSpinningState: true, isInteractable: false);
         }
@@ -624,18 +623,6 @@ public class UIManager : MonoBehaviour
                 AudioManager.Instance?.PlayTakeButton();
                 SetSpinButtonMode(SpinButtonMode.FreeGamesTake, interactable: false);
                 if (freeGameView != null) freeGameView.OnTakePressed();
-                return;
-
-            case SpinButtonMode.HoldAndSpinStart:
-                AudioManager.Instance?.PlayButton();
-                SetSpinButtonMode(SpinButtonMode.HoldAndSpinStart, interactable: false);
-                gameManager.StartFirstHoldSpin();
-                return;
-
-            case SpinButtonMode.HoldAndSpinTake:
-                AudioManager.Instance?.PlayTakeButton();
-                SetSpinButtonMode(SpinButtonMode.HoldAndSpinTake, interactable: false);
-                if (holdAndSpinView != null) holdAndSpinView.OnTakePressed();
                 return;
 
             case SpinButtonMode.BigWinTake:
@@ -1133,7 +1120,8 @@ public class UIManager : MonoBehaviour
     // spin object. All six are now modes on the same button.
     //
     // The two Takes share their art but stay distinct because they answer to different owners:
-    // FreeGamesTake calls back into FreeGameView, BigWinTake closes the popup.
+    // FreeGamesTake calls back into FreeGameView, BigWinTake closes the popup. A new feature that
+    // takes the button over wants its own mode for the same reason.
     internal enum SpinButtonMode
     {
         Spin,
@@ -1141,8 +1129,6 @@ public class UIManager : MonoBehaviour
         AutoplayStop,
         FreeGamesStart,
         FreeGamesTake,
-        HoldAndSpinStart,
-        HoldAndSpinTake,
         BigWinTake
     }
 
@@ -1155,17 +1141,15 @@ public class UIManager : MonoBehaviour
     {
         return mode == SpinButtonMode.FreeGamesStart
             || mode == SpinButtonMode.FreeGamesTake
-            || mode == SpinButtonMode.HoldAndSpinStart
-            || mode == SpinButtonMode.HoldAndSpinTake
             || mode == SpinButtonMode.BigWinTake;
     }
 
     internal void SetSpinButtonMode(SpinButtonMode mode, bool interactable = true)
     {
         // Returning to Spin means a round is over, so the win box goes back to GOOD LUCK. This used
-        // to sit alongside a show/hide of a game logo left over from Sizzling 7s — Golden Dynasty
-        // has no such object, and only Free Games ever hid it, so Hold & Spin ending on Spin mode
-        // switched an authored-off object on and left it on.
+        // to sit alongside a show/hide of a game logo left over from Sizzling 7s. The lesson from
+        // removing it: only hide something here that this method also showed, or a round ending will
+        // switch on an object the scene deliberately authored off, and leave it on.
         if (mode == SpinButtonMode.Spin)
         {
             UpdateWinDisplay(0);
@@ -1186,10 +1170,8 @@ public class UIManager : MonoBehaviour
         {
             case SpinButtonMode.Stop:           set = stopSprites; break;
             case SpinButtonMode.AutoplayStop:   set = autoplayStopSprites; break;
-            case SpinButtonMode.FreeGamesStart:
-            case SpinButtonMode.HoldAndSpinStart: set = startSprites; break;
+            case SpinButtonMode.FreeGamesStart: set = startSprites; break;
             case SpinButtonMode.FreeGamesTake:
-            case SpinButtonMode.HoldAndSpinTake:
             case SpinButtonMode.BigWinTake:     set = takeSprites; break;
             default:                            set = spinSprites; break;
         }

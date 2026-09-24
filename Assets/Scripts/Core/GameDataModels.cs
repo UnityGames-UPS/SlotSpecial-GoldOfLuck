@@ -297,13 +297,11 @@ public class GameConfig
     public int maxTotalFreeGames;
 
     // Resolved from the init symbol table. -1 means "not present", so an unresolved role can never
-    // collide with a real symbol id the way a 0 default would. Orb and Mystery no longer exist in
-    // this game and stay -1; the fields remain only because SlotView and SocketIOManager still read
-    // them, and go when Hold & Spin and Mystery are stripped.
+    // collide with a real symbol id the way a 0 default would — and -1 stays meaningful downstream:
+    // SocketIOManager keeps both off the pre-spin placeholder board, and reads -1 as "no such
+    // symbol, leave nothing out".
     public int wildSymbolId = -1;
     public int scatterSymbolId = -1;
-    public int orbSymbolId = -1;
-    public int mysterySymbolId = -1;
 }
 
 [Serializable]
@@ -379,11 +377,6 @@ public class SpinResult
 
     // Always present. triggered is false on almost every spin.
     public GenieWheelData genieWheel;
-
-    // TRANSITIONAL — nothing sends either of these any more, so both are always empty. They stay so
-    // the Mystery and Hold & Spin code still compiles, and go when those features are stripped.
-    public List<int> mysteryPositions;
-    public HoldAndSpinData holdAndSpin;
 }
 
 /// <summary>
@@ -451,20 +444,6 @@ public class GenieWheelData
     public int freeGames;
     // The cash prize, already inside SpinResult.winAmount.
     public double winAmount;
-}
-
-/// <summary>
-/// TRANSITIONAL. Hold and Spin no longer exists in this game and nothing fills this in beyond an
-/// empty instance. Removed together with HoldAndSpinView.
-/// </summary>
-[Serializable]
-public class HoldAndSpinData
-{
-    public bool active;
-    public bool triggered;
-    public int spinsRemaining;
-    public double roundWin;
-    public Dictionary<int, double> orbPrizes;
 }
 
 #endregion
@@ -668,11 +647,7 @@ public static class InitDataConverter
 
             freeGame = ConvertFreeGame(payload?.freeGames, payload?.genieWheel),
             genieMultipliers = ConvertGenieMultipliers(payload?.genieMultipliers, gameConfig),
-            genieWheel = ConvertGenieWheel(payload?.genieWheel),
-
-            // Transitional: see SpinResult. Empty rather than null so the old consumers need no guards.
-            mysteryPositions = new List<int>(),
-            holdAndSpin = new HoldAndSpinData { orbPrizes = new Dictionary<int, double>() }
+            genieWheel = ConvertGenieWheel(payload?.genieWheel)
         };
     }
 

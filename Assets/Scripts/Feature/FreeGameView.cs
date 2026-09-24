@@ -13,8 +13,8 @@ using DG.Tweening;
 /// FreeGamesTexts or FreeGamesOver themselves: deactivating those would halt these coroutines
 /// mid-sequence.
 ///
-/// The Mystery reveal is deliberately NOT here. It draws over the reels, between them landing and
-/// the win animations, so it belongs to SlotView along with the rest of the reel presentation.
+/// Anything that draws over the REELS belongs to SlotView, not here — this owns the panels around
+/// the board, not the board itself.
 /// </summary>
 public class FreeGameView : MonoBehaviour
 {

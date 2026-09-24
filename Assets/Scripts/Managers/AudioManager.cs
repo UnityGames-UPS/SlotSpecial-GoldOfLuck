@@ -58,12 +58,6 @@ public class AudioManager : MonoBehaviour
     [SerializeField] private AudioClip clipTurboButton;
 
     [Header("Audio Clips - Golden Dynasty")]
-    [Tooltip("The Mystery reveal. ONE shot for the whole reveal, not one per door — a spin can reveal up to 15 cells on the same frame.")]
-    [SerializeField] private AudioClip clipMysteryDoorOpen;
-
-    [Tooltip("Plays as the Winner graphic starts animating and the red holder takes over, at the end of a Hold & Spin round.")]
-    [SerializeField] private AudioClip clipWinnerAnimation;
-
     [Tooltip("The Free Games round running out. Plays alone — the congratulations cue and its panel wait for this one to finish.")]
     [SerializeField] private AudioClip clipFreeGamesComplete;
 
@@ -73,23 +67,8 @@ public class AudioManager : MonoBehaviour
     [Tooltip("Phase 2 of the win presentation moving to the next win line. Fires on every change, and Phase 2 cycles until the player spins.")]
     [SerializeField] private AudioClip clipWinLineChange;
 
-    [Tooltip("An Orb landing on a BASE-GAME reel. One shot per reel that contains at least one.")]
-    [SerializeField] private AudioClip clipOrbLand;
-
-    [Tooltip("An Orb landing during a Hold & Spin round. The feature's own counterpart to clipOrbLand.")]
-    [SerializeField] private AudioClip clipOrbLandFeature;
-
-    [Tooltip("6+ Orbs — the Hold & Spin trigger. Plays after every Orb has landed and BEFORE the full-screen intro.")]
-    [SerializeField] private AudioClip clipHoldAndSpinTrigger;
-
-    [Tooltip("Plays with the Hold & Spin full-screen intro animation, straight after clipHoldAndSpinTrigger.")]
-    [SerializeField] private AudioClip clipHoldAndSpinIntro;
-
     [Tooltip("A Wild ANIMATING as part of a win — once per spin, in Phase 1 only. Wild landings have no cue.")]
     [SerializeField] private AudioClip clipWildAnimate;
-
-    [Tooltip("One dragon leaving its Orb during the Hold & Spin payout walk. Fires per dragon.")]
-    [SerializeField] private AudioClip clipDragonLeaveOrb;
 
     [Tooltip("The win amount counting up in the universal win popup.")]
     [SerializeField] private AudioClip clipWinCountUp;
@@ -337,15 +316,8 @@ public class AudioManager : MonoBehaviour
 
     // 17. Golden Dynasty cues.
     internal void PlayWinLineChange()      => PlayUISound(clipWinLineChange);
-    internal void PlayOrbLand()            => PlayUISound(clipOrbLand);
-    internal void PlayOrbLandFeature()     => PlayUISound(clipOrbLandFeature);
-    internal void PlayHoldAndSpinTrigger() => PlayUISound(clipHoldAndSpinTrigger);
-    internal void PlayHoldAndSpinIntro()   => PlayUISound(clipHoldAndSpinIntro);
     internal void PlayWildAnimate()        => PlayUISound(clipWildAnimate);
-    internal void PlayDragonLeaveOrb()     => PlayUISound(clipDragonLeaveOrb);
     internal void PlayWinCountUp()         => PlayUISound(clipWinCountUp);
-    internal void PlayMysteryDoorOpen() => PlayUISound(clipMysteryDoorOpen);
-    internal void PlayWinnerAnimation() => PlayUISound(clipWinnerAnimation);
     internal void PlayCongratulations() => PlayUISound(clipCongratulations);
 
     /// <summary>

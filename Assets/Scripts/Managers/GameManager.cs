@@ -10,14 +10,11 @@ public class GameManager : MonoBehaviour
     [SerializeField] private PopupManager popupManager;
     [SerializeField] private SlotView slotView;
     [SerializeField] private FreeGameView freeGameView;
-    [SerializeField] private HoldAndSpinView holdAndSpinView;
 
     [Header("Spin Settings")]
     [SerializeField] private float normalSpinDuration = 3.5f;
     [SerializeField] private float turboSpinDuration = 2.0f;
     [SerializeField] private float quickSpinCycleDuration = 0.1f;
-    [Tooltip("How long the Hold & Spin cells scroll before they start landing. Shorter than a base spin: a round is many respins long and often only one cell is moving.")]
-    [SerializeField] private float holdSpinDuration = 1.2f;
 
     [Header("Free Games Timing")]
     [Tooltip("How long the scatters animate before the award prompt or, on a retrigger, before the counter climbs.")]
@@ -28,20 +25,20 @@ public class GameManager : MonoBehaviour
     [Header("Win Settings")]
     [SerializeField] private double bigWinMultiplierThreshold = 500.0;
 
-    // Master switches for the two feature rounds, both OFF while the backend binding is brought up.
-    // Off means the round is never entered: the trigger spin is presented as an ordinary spin and
-    // ProcessSpinResult carries on. Nothing is removed — the views, the round state and the
-    // lifecycle below are all intact, so flipping a switch to true restores the feature as it was.
+    // Master switch for the Free Games round, OFF while the backend binding is brought up. Off means
+    // the round is never entered: the trigger spin is presented as an ordinary spin and
+    // ProcessSpinResult carries on. Nothing is removed — the view, the round state and the lifecycle
+    // below are all intact, so flipping this to true restores the feature as it was.
     //
-    // Free Games off also means the server can still put the player into a round (a wheel landing on
-    // a free-games slice does) which this client then plays as normal spins: the server treats them
-    // as free, and the optimistic bet deduction in StartSpin is overwritten by the balance it sends.
+    // Off is not a clean state against the live server. A wheel landing on a free-games slice still
+    // puts the SERVER into a round, which this client then plays as normal spins: the server treats
+    // them as free, so the balance ends up right, but the optimistic bet deduction in StartSpin is
+    // overwritten by the balance the response carries, so it flickers.
     //
     // Un-serialized on purpose, like the other tuning constants: a serialized flag would be
     // overridden by whatever the scene saved. static readonly rather than const so the compiler does
-    // not flag the code behind a switch as unreachable.
+    // not flag the code behind the switch as unreachable.
     internal static readonly bool FreeGamesEnabled = false;
-    internal static readonly bool HoldAndSpinEnabled = false;
 
     internal GameConfig gameConfig;
     internal PlayerData playerData;
@@ -73,19 +70,6 @@ public class GameManager : MonoBehaviour
     // The total the counter was showing before a retrigger landed, so its count-up has somewhere to
     // start from. -1 when no retrigger is pending presentation.
     private int retriggerTotalBefore = -1;
-
-    // True from the moment a Hold & Spin round is triggered until the player takes the win.
-    // Tracked here rather than read off the wire each spin because the presentation runs on for a
-    // while after the server has already closed the round.
-    internal bool isInHoldAndSpin;
-    internal int holdSpinRemaining;        // display only — never used to decide the round is over
-    internal double holdSpinRoundWin;      // server-authoritative, from features.holdAndSpin
-
-    // Every held Orb and its prize, as of the round's final spin. Kept here rather than cached in
-    // the view: the view receives orbPrizes to render each spin, but retaining it for a different
-    // sequence would leave server data in a view's keeping across a sequence boundary. All the other
-    // round state lives here too, and this rides to the payout alongside holdSpinRoundWin.
-    private Dictionary<int, double> holdSpinOrbPrizes;
 
     internal bool isInitialized;
     internal bool initializationFailed;
@@ -197,7 +181,7 @@ public class GameManager : MonoBehaviour
         if (!socketManager.isConnected) return;
 
         double totalPay = GetTotalPay();
-        if (!isInFreeSpins && !isInHoldAndSpin && playerData.balance < totalPay)
+        if (!isInFreeSpins && playerData.balance < totalPay)
         {
             if (popupManager != null)
             {
@@ -217,11 +201,10 @@ public class GameManager : MonoBehaviour
             {
                 StopAutoPlay();
             }
-            // Neither feature round can be stopped by hand: free games run themselves, and a Hold &
-            // Spin respin has only Start and Take as presses. A stop here would also set
-            // stopRequested, which SlotView reads as a quick stop on reels that are not even
-            // spinning during a round.
-            else if (!isInFreeSpins && !isInHoldAndSpin)
+            // A feature round cannot be stopped by hand — free games run themselves. A stop here
+            // would also set stopRequested, which SlotView reads as a quick stop, and a round that
+            // presents its own reels would be told to quick-stop reels that are not even spinning.
+            else if (!isInFreeSpins)
             {
                 stopRequested = true;
                 uiManager.SetSpinStopButtonStates(isSpinningState: true, isInteractable: false);
@@ -240,9 +223,9 @@ public class GameManager : MonoBehaviour
         currentState = GameState.Spinning;
         stopRequested = false;
 
-        // Deduct total pay from balance on spin start (except in free spins and Hold & Spin
-        // respins, both of which the server plays for free — the triggering spin was the paid one).
-        if (!isInFreeSpins && !isInHoldAndSpin)
+        // Deduct total pay from balance on spin start (except in free spins, which the server plays
+        // for free — the triggering spin was the paid one).
+        if (!isInFreeSpins)
         {
             playerData.balance -= GetTotalPay();
             if (playerData.balance < 0) playerData.balance = 0;
@@ -250,19 +233,12 @@ public class GameManager : MonoBehaviour
 
         uiManager.OnSpinStarted();
 
-        // The column reels sit out a Hold & Spin round entirely — they are hidden and the fifteen
-        // cell reels occupy their positions. Starting them here would scroll a board nobody sees
-        // and leave the loop running underneath the feature.
-        if (isInHoldAndSpin)
-        {
-            if (holdAndSpinView != null) holdAndSpinView.StartCellSpin();
-        }
-        else if (slotView != null)
+        if (slotView != null)
         {
             slotView.StartSpin();
         }
 
-        socketManager.SendSpinRequest(currentBetIndex, isInFreeSpins);
+        socketManager.SendSpinRequest(currentBetIndex);
 
         if (spinCoroutine != null)
             StopCoroutine(spinCoroutine);
@@ -293,30 +269,6 @@ public class GameManager : MonoBehaviour
         }
 
         currentState = GameState.Stopping;
-
-        // A Hold & Spin respin is run entirely by the feature view: fifteen cells stopping one at a
-        // time, holding whichever land an Orb. SlotView's column stop is not involved — its reels
-        // are hidden for the duration.
-        if (isInHoldAndSpin)
-        {
-            if (holdAndSpinView != null)
-            {
-                holdAndSpinView.RunSpin(
-                    lastResult.resultMatrix,
-                    lastResult.holdAndSpin?.orbPrizes,
-                    holdSpinRemaining,
-                    OnReelsStoppedComplete);
-            }
-            else
-            {
-                // Unwired view: the round still has to advance, or the game locks up. Falling
-                // through to SlotView's stop is not an option — those reels are hidden and were
-                // never started.
-                OnReelsStoppedComplete();
-            }
-
-            yield break;
-        }
 
         if (slotView != null && lastResult.resultMatrix != null)
         {
@@ -357,20 +309,14 @@ public class GameManager : MonoBehaviour
             };
         }
 
-        // Mystery symbols open before anything else is presented. The reveal has to finish for
-        // every cell before the win animations start, so the rest of this runs from its callback.
-        // Spins with no Mystery fall straight through.
-        if (slotView != null && lastResult != null && lastResult.mysteryPositions != null && lastResult.mysteryPositions.Count > 0)
-        {
-            slotView.PlayMysteryReveal(lastResult.mysteryPositions, PresentSpinOutcome);
-        }
-        else
-        {
-            PresentSpinOutcome();
-        }
+        // Kept as its own method, and reached by a plain call: anything that has to alter the board
+        // between the reels landing and the win being presented belongs BEFORE this, running
+        // PresentSpinOutcome from its own completion callback rather than alongside it. The board
+        // has to be final before any win animation starts.
+        PresentSpinOutcome();
     }
 
-    // Everything that happens once the board is final — after the Mystery reveal, if there was one.
+    // Everything that happens once the board is final.
     private void PresentSpinOutcome()
     {
         // A spin that awards Free Games is not over once its outcome is presented: the Scatters
@@ -380,8 +326,8 @@ public class GameManager : MonoBehaviour
         // ProcessSpinResult consumed THAT spin's result, leaving its reels spinning forever.
         //
         // So the controller stays out of Idle until the round is entered. Every spin, bet and
-        // autoplay entry point already refuses anything but Idle; StartFreeSpins — or
-        // StartHoldAndSpin on a spin that triggers both — is what puts it back.
+        // autoplay entry point already refuses anything but Idle; whatever enters the round —
+        // StartFreeSpins today — is what puts it back.
         GameState settledState = IsFreeGamesTrigger(lastResult) ? GameState.ShowingWin : GameState.Idle;
 
         if (lastResult != null && lastResult.winAmount > 0 && lastResult.winLines != null && lastResult.winLines.Count > 0)
@@ -411,10 +357,10 @@ public class GameManager : MonoBehaviour
             uiManager.OnSpinStopping(lastResult);
             currentState = settledState;
 
-            // Still handed to the view, just with nothing to present. A spin with no lines can
-            // leave presentation state behind — a Mystery reveal holds the dim up for a win that
-            // is now never coming — and what to do about that is SlotView's call, not this one's.
-            // Skipping the view here is what left the board dimmed after a no-win Mystery spin.
+            // Still handed to the view, just with nothing to present. A losing spin can arrive with
+            // presentation state already raised — something earlier in the spin may have put the dim
+            // up for a win that is now never coming — and clearing that is SlotView's call, not this
+            // one's. Skipping the view here is what used to leave the board dimmed after a no-win.
             if (slotView != null)
             {
                 slotView.ShowWinLineAnimation(null, OnWinAnimationComplete);
@@ -562,22 +508,12 @@ public class GameManager : MonoBehaviour
         ProcessSpinResult();
     }
 
+    // If a feature round ever wants a spin duration of its own, shorten it by the same PROPORTION
+    // turbo shortens a base spin rather than returning the base game's turbo duration directly —
+    // that figure can easily be LONGER than the feature's own normal duration, which once made Turbo
+    // and Quick Spin slower than Normal inside a round.
     private float GetSpinDuration()
     {
-        // A Hold & Spin respin is its own thing: often only one or two cells are moving, and the
-        // round is many spins long, so the base game's duration would make it a slog. Turbo still
-        // shortens it — the feature honours turbo like any other spin. Quick Spin counts as Turbo
-        // here, since the cells have no quick-stop path.
-        //
-        // Shortened by the same PROPORTION turbo shortens a base spin, not replaced by the base
-        // game's turbo duration. That used to be returned as-is, and it is longer than
-        // holdSpinDuration — so Turbo and Quick Spin made every respin slower than Normal.
-        if (isInHoldAndSpin)
-        {
-            if (currentSpinSpeed == SpinSpeed.Normal || normalSpinDuration <= 0f) return holdSpinDuration;
-            return holdSpinDuration * (turboSpinDuration / normalSpinDuration);
-        }
-
         return currentSpinSpeed switch
         {
             SpinSpeed.Normal => normalSpinDuration,
@@ -621,28 +557,6 @@ public class GameManager : MonoBehaviour
                 freeGameView.UpdateCounter(freeSpinsRemaining, FreeSpinsTotalAwarded);
             }
         }
-
-        // Hold & Spin's counters, kept for display only. The round's end is decided by
-        // holdAndSpin.active in ProcessSpinResult, never by this reaching zero — captured rounds
-        // that ended by filling the board still reported 3 and 2 spins remaining.
-        if (result.holdAndSpin != null)
-        {
-            holdSpinRemaining = result.holdAndSpin.spinsRemaining;
-
-            // The total comes from currentWinning, NOT from holdAndSpin.roundWin (totalOrbPayout).
-            // They agree, but only currentWinning is rounded — one captured payout arrived as
-            // 12.100000000000001 in totalOrbPayout against a clean 12.1 in currentWinning, and it
-            // is currentWinning the balance actually moved by. Zero on every spin until the payout.
-            if (isInHoldAndSpin)
-            {
-                holdSpinRoundWin = result.winAmount;
-
-                // Captured every spin, so whatever the last one carried is what the payout walk
-                // gets. Prizes are frozen once an Orb lands, so the final map holds every held Orb
-                // at the value the server computed the total from.
-                holdSpinOrbPrizes = result.holdAndSpin.orbPrizes;
-            }
-        }
     }
 
     // A trigger is a spin that awarded spins while not itself being a free spin — the awarding
@@ -663,35 +577,10 @@ public class GameManager : MonoBehaviour
 
         uiManager.OnSpinCompleted(lastResult);
 
-        HoldAndSpinData holdAndSpin = lastResult.holdAndSpin;
-
-        // A Hold & Spin round ends on active going false — never on spinsRemaining reaching zero.
-        // Captured rounds that ended by filling the board reported 3 and 2 spins remaining, because
-        // the Orb that filled it had just reset the counter on the same spin that closed the round.
-        if (isInHoldAndSpin)
-        {
-            if (holdAndSpin == null || !holdAndSpin.active)
-            {
-                EndHoldAndSpin();
-            }
-            else
-            {
-                currentState = GameState.Idle;
-                StartCoroutine(DelayBeforeNextHoldSpin());
-            }
-
-            lastResult = null;
-            return;
-        }
-
-        // The triggering spin is an ordinary paid base spin that happens to report triggered.
-        if (HoldAndSpinEnabled && holdAndSpin != null && holdAndSpin.triggered)
-        {
-            StartHoldAndSpin(holdAndSpin);
-            lastResult = null;
-            return;
-        }
-
+        // This is the single place a round is entered or advanced. A feature added here should end
+        // its round on the server's own "still active" flag, never on a spins-remaining counter
+        // reaching zero — a round can close on the very spin that reset its counter, so the two do
+        // not agree.
         if (IsFreeGamesTrigger(lastResult))
         {
             StartFreeSpins(lastResult.freeGame.spinsRemaining);
@@ -801,12 +690,12 @@ public class GameManager : MonoBehaviour
         // after Phase 1. Now that no further spin is coming, present it the way a manual spin would.
         // Covers both endings: the last scheduled round, and the player stopping part-way.
         //
-        // Both feature rounds are excluded. StartHoldAndSpin calls this to park autoplay before the
-        // round begins, and the triggering spin may well have paid a line — cycling those lines here
-        // would run them underneath the feature intro for the next twenty seconds. The same goes
-        // for a Free Games trigger still holding for its Scatters (ShowingWin): the cycle would
-        // tear the Scatter celebration down and then loop under the Start prompt.
-        if (!isInFreeSpins && !isInHoldAndSpin && currentState != GameState.ShowingWin && slotView != null)
+        // Feature rounds are excluded. A round that parks autoplay before it begins may well have
+        // paid a line on its triggering spin, and cycling those lines here would run them underneath
+        // the feature intro for its whole duration. The same goes for a Free Games trigger still
+        // holding for its Scatters (ShowingWin): the cycle would tear the Scatter celebration down
+        // and then loop under the Start prompt.
+        if (!isInFreeSpins && currentState != GameState.ShowingWin && slotView != null)
         {
             slotView.PlayWinLineCycle();
         }
@@ -955,138 +844,6 @@ public class GameManager : MonoBehaviour
         freeSpinsUsed = 0;
         freeSpinsRoundWin = 0;
         retriggerTotalBefore = -1;
-
-        uiManager.SetSpinButtonMode(UIManager.SpinButtonMode.Spin);
-        uiManager.SetFreeGamesButtonLock(false);
-
-        currentState = GameState.Idle;
-
-        if (ShouldResumeAutoPlay())
-        {
-            ResumeAutoPlay();
-        }
-    }
-
-    #endregion
-
-    #region Hold & Spin
-
-    // The triggering spin has landed and been presented. Its Orbs are already drawn on the Orb
-    // layer by the base-game pass, and the feature adopts them rather than redrawing — which is
-    // what stops their animations restarting as the round begins.
-    private void StartHoldAndSpin(HoldAndSpinData holdAndSpin)
-    {
-        isInHoldAndSpin = true;
-        holdSpinRemaining = holdAndSpin.spinsRemaining;
-        holdSpinRoundWin = 0;
-
-        AudioManager.Instance?.PlayFreeSpinBg();
-
-        int prevTotal = autoPlayTotalRounds;
-        int prevRemaining = autoPlayRemainingRounds;
-
-        // Shares the free-games save slot deliberately. The two rounds can never overlap — one spin
-        // enters one feature — and the fields hold "autoplay as it was before a feature round"
-        // rather than anything specific to free games.
-        if (isAutoPlaying)
-        {
-            StopAutoPlay();
-            wasAutoPlayingBeforeFreeSpins = true;
-            savedAutoPlayTotalRounds = prevTotal;
-            savedAutoPlayRemainingRounds = (prevTotal != -1) ? (prevRemaining - 1) : -1;
-        }
-
-        uiManager.SetFreeGamesButtonLock(true);
-
-        // Start comes up in its Hold & Spin skin but DEAD, and stays that way for the whole trigger
-        // sequence. The button is pressable only once the prompt that asks for it is on screen —
-        // pressing during the full-screen intro would otherwise start the round underneath it.
-        uiManager.SetSpinButtonMode(UIManager.SpinButtonMode.HoldAndSpinStart, interactable: false);
-
-        currentState = GameState.Idle;
-
-        if (holdAndSpinView != null)
-        {
-            holdAndSpinView.BeginTrigger(holdAndSpin.orbPrizes, OnHoldSpinTriggerComplete);
-        }
-        else
-        {
-            // No view to run the sequence, so nothing will ever call back. Hand the button over
-            // immediately rather than leaving the player with a dead Start and no way forward.
-            OnHoldSpinTriggerComplete();
-        }
-    }
-
-    // The trigger sequence has finished: the intro has played out and the "PRESS START FEATURE
-    // BUTTON" prompt is up. Only now does Start become pressable.
-    private void OnHoldSpinTriggerComplete()
-    {
-        uiManager.SetSpinButtonMode(UIManager.SpinButtonMode.HoldAndSpinStart, interactable: true);
-    }
-
-    // The Start button — routed here by UIManager's HoldAndSpinStart mode. The prompt gives way to
-    // the counters and the first respin follows.
-    internal void StartFirstHoldSpin()
-    {
-        uiManager.SetSpinButtonMode(UIManager.SpinButtonMode.HoldAndSpinStart, interactable: false);
-
-        if (holdAndSpinView == null)
-        {
-            StartCoroutine(DelayBeforeNextHoldSpin());
-            return;
-        }
-
-        holdAndSpinView.StartRound(holdSpinRemaining, () => StartCoroutine(DelayBeforeNextHoldSpin()));
-    }
-
-    private IEnumerator DelayBeforeNextHoldSpin()
-    {
-        yield return new WaitForSeconds(0.3f);
-        RequestSpin();
-    }
-
-    // The server has closed the round and paid it through currentWinning. Everything from here is
-    // presentation; the money has already moved.
-    private void EndHoldAndSpin()
-    {
-        double roundWin = holdSpinRoundWin;
-        var orbPrizes = holdSpinOrbPrizes;
-
-        // Cleared before the outro so the win box stops being suppressed and the balance display
-        // behaves normally again while the payout counts up.
-        isInHoldAndSpin = false;
-        holdSpinRemaining = 0;
-
-        AudioManager.Instance?.PlayMainBg();
-
-        if (holdAndSpinView != null)
-        {
-            holdAndSpinView.PlayOutro(roundWin, orbPrizes, OnHoldSpinCountUpComplete, OnHoldSpinOutroComplete);
-        }
-        else
-        {
-            OnHoldSpinOutroComplete();
-        }
-    }
-
-    // The total has finished counting up — Take becomes pressable. HoldAndSpinView owns what
-    // happens on the press and calls back through OnHoldSpinOutroComplete.
-    private void OnHoldSpinCountUpComplete()
-    {
-        uiManager.SetSpinButtonMode(UIManager.SpinButtonMode.HoldAndSpinTake);
-    }
-
-    // Player took the win — put the board back.
-    private void OnHoldSpinOutroComplete()
-    {
-        holdSpinRoundWin = 0;
-        holdSpinOrbPrizes = null;
-
-        // The Orb layer is deliberately NOT cleared here. The board the player is handed back still
-        // shows the triggering spin's Orbs, and an Orb has to carry its prize — the view rebuilt
-        // the layer to match that board behind the blackout. It clears on its own on the next spin,
-        // through SlotView's DisableAllOverlays.
-        if (holdAndSpinView != null) holdAndSpinView.ResetToDefault();
 
         uiManager.SetSpinButtonMode(UIManager.SpinButtonMode.Spin);
         uiManager.SetFreeGamesButtonLock(false);
