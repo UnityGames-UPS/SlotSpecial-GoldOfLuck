@@ -23,7 +23,9 @@ public class GameManager : MonoBehaviour
     [SerializeField] private int scatterTriggerLoops = 2;
 
     [Header("Win Settings")]
-    [SerializeField] private double bigWinMultiplierThreshold = 500.0;
+    // Win / total bet at or above which the big-win popup plays. Serialized, so the scene's value is
+    // the one that runs — this default only matters for a fresh component. Kept equal to the scene.
+    [SerializeField] private double bigWinMultiplierThreshold = 10.0;
 
     // Master switch for the Free Games round, OFF while the backend binding is brought up. Off means
     // the round is never entered: the trigger spin is presented as an ordinary spin and

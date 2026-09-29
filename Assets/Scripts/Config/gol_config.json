@@ -201,9 +201,9 @@
         4
       ],
       "reelsInstance": {
-        "2": 2,
-        "3": 2,
-        "4": 2
+        "2": 30,
+        "3": 30,
+        "4": 30
       }
     }
   ],
@@ -233,202 +233,130 @@
       "enabled": true,
       "segments": [
         {
+          "coin": 2,
+          "type": "COIN",
+          "freeGames": 0,
+          "multiplier": 0,
+          "probability": 0.1062
+        },
+        {
+          "coin": 0,
           "type": "MULTIPLIER",
           "freeGames": 0,
           "multiplier": 2,
-          "probability": 0.0793
+          "probability": 0.0928
         },
         {
+          "coin": 8,
+          "type": "COIN",
+          "freeGames": 0,
+          "multiplier": 0,
+          "probability": 0.0663
+        },
+        {
+          "coin": 0,
           "type": "MULTIPLIER",
           "freeGames": 0,
-          "multiplier": 4,
-          "probability": 0.0561
+          "multiplier": 3,
+          "probability": 0.0729
         },
         {
-          "type": "MULTIPLIER",
+          "coin": 16,
+          "type": "COIN",
           "freeGames": 0,
-          "multiplier": 6,
-          "probability": 0.0458
+          "multiplier": 0,
+          "probability": 0.0531
         },
         {
-          "type": "MULTIPLIER",
+          "coin": 0,
+          "type": "FREE_GAMES",
+          "freeGames": 8,
+          "multiplier": 0,
+          "probability": 0.0464
+        },
+        {
+          "coin": 30,
+          "type": "COIN",
           "freeGames": 0,
-          "multiplier": 8,
-          "probability": 0.0396
+          "multiplier": 0,
+          "probability": 0.0332
         },
         {
+          "coin": 0,
           "type": "MULTIPLIER",
           "freeGames": 0,
           "multiplier": 10,
-          "probability": 0.0355
+          "probability": 0.0265
         },
         {
-          "type": "MULTIPLIER",
+          "coin": 4,
+          "type": "COIN",
           "freeGames": 0,
-          "multiplier": 12,
-          "probability": 0.0324
+          "multiplier": 0,
+          "probability": 0.0862
         },
         {
+          "coin": 0,
           "type": "MULTIPLIER",
           "freeGames": 0,
-          "multiplier": 14,
-          "probability": 0.03
+          "multiplier": 2,
+          "probability": 0.0928
         },
         {
-          "type": "MULTIPLIER",
+          "coin": 20,
+          "type": "COIN",
           "freeGames": 0,
-          "multiplier": 16,
-          "probability": 0.028
+          "multiplier": 0,
+          "probability": 0.0424
         },
         {
-          "type": "MULTIPLIER",
-          "freeGames": 0,
-          "multiplier": 18,
-          "probability": 0.0264
+          "coin": 0,
+          "type": "FREE_GAMES",
+          "freeGames": 10,
+          "multiplier": 0,
+          "probability": 0.0371
         },
         {
-          "type": "MULTIPLIER",
+          "coin": 40,
+          "type": "COIN",
           "freeGames": 0,
-          "multiplier": 20,
-          "probability": 0.0251
-        },
-        {
-          "type": "MULTIPLIER",
-          "freeGames": 0,
-          "multiplier": 22,
-          "probability": 0.0239
-        },
-        {
-          "type": "MULTIPLIER",
-          "freeGames": 0,
-          "multiplier": 24,
-          "probability": 0.0229
-        },
-        {
-          "type": "MULTIPLIER",
-          "freeGames": 0,
-          "multiplier": 26,
-          "probability": 0.022
-        },
-        {
-          "type": "MULTIPLIER",
-          "freeGames": 0,
-          "multiplier": 28,
+          "multiplier": 0,
           "probability": 0.0212
         },
         {
+          "coin": 0,
           "type": "MULTIPLIER",
           "freeGames": 0,
-          "multiplier": 30,
-          "probability": 0.0205
+          "multiplier": 5,
+          "probability": 0.0531
         },
         {
-          "type": "MULTIPLIER",
+          "coin": 12,
+          "type": "COIN",
           "freeGames": 0,
-          "multiplier": 32,
-          "probability": 0.0198
-        },
-        {
-          "type": "MULTIPLIER",
-          "freeGames": 0,
-          "multiplier": 34,
-          "probability": 0.0192
-        },
-        {
-          "type": "MULTIPLIER",
-          "freeGames": 0,
-          "multiplier": 36,
-          "probability": 0.0187
-        },
-        {
-          "type": "MULTIPLIER",
-          "freeGames": 0,
-          "multiplier": 38,
-          "probability": 0.0182
-        },
-        {
-          "type": "MULTIPLIER",
-          "freeGames": 0,
-          "multiplier": 40,
-          "probability": 0.0177
-        },
-        {
-          "type": "MULTIPLIER",
-          "freeGames": 0,
-          "multiplier": 42,
-          "probability": 0.0173
-        },
-        {
-          "type": "MULTIPLIER",
-          "freeGames": 0,
-          "multiplier": 44,
-          "probability": 0.0169
-        },
-        {
-          "type": "MULTIPLIER",
-          "freeGames": 0,
-          "multiplier": 46,
-          "probability": 0.0165
-        },
-        {
-          "type": "MULTIPLIER",
-          "freeGames": 0,
-          "multiplier": 48,
-          "probability": 0.0162
-        },
-        {
-          "type": "MULTIPLIER",
-          "freeGames": 0,
-          "multiplier": 50,
-          "probability": 0.0159
-        },
-        {
-          "type": "MULTIPLIER",
-          "freeGames": 0,
-          "multiplier": 52,
-          "probability": 0.0155
-        },
-        {
-          "type": "MULTIPLIER",
-          "freeGames": 0,
-          "multiplier": 54,
-          "probability": 0.0153
-        },
-        {
-          "type": "MULTIPLIER",
-          "freeGames": 0,
-          "multiplier": 56,
-          "probability": 0.015
-        },
-        {
-          "type": "MULTIPLIER",
-          "freeGames": 0,
-          "multiplier": 58,
-          "probability": 0.0147
-        },
-        {
-          "type": "MULTIPLIER",
-          "freeGames": 0,
-          "multiplier": 60,
-          "probability": 0.0144
-        },
-        {
-          "type": "FREE_GAMES",
-          "freeGames": 3,
           "multiplier": 0,
-          "probability": 0.08
+          "probability": 0.0597
         },
         {
-          "type": "FREE_GAMES",
-          "freeGames": 3,
-          "multiplier": 0,
-          "probability": 0.08
+          "coin": 0,
+          "type": "MULTIPLIER",
+          "freeGames": 0,
+          "multiplier": 3,
+          "probability": 0.0729
         },
         {
-          "type": "FREE_GAMES",
-          "freeGames": 3,
+          "coin": 60,
+          "type": "COIN",
+          "freeGames": 0,
           "multiplier": 0,
-          "probability": 0.08
+          "probability": 0.0133
+        },
+        {
+          "coin": 0,
+          "type": "FREE_GAMES",
+          "freeGames": 15,
+          "multiplier": 0,
+          "probability": 0.0239
         }
       ],
       "symbolId": 9,

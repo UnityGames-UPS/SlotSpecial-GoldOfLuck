@@ -304,8 +304,37 @@ public class UIManager : MonoBehaviour
         else
         {
             AudioManager.Instance?.PlayBgMusic();
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (DebugShowBigWinOnStart) StartCoroutine(DebugShowBigWinAfterStart());
+#endif
         }
     }
+
+    // ── TEMPORARY: big-win popup test trigger ──────────────────────────────────────────────────
+    // Opens the big-win popup once, shortly after the game finishes initializing, so its open and loop
+    // animations can be checked without having to land a qualifying win. Remove once the popup is
+    // signed off (tracked in ToDo.md).
+    //
+    // Compiled into the Editor and development builds only, so a release build can never show it even
+    // if this is left on. It goes through the real ShowUniversalWinPopup, so Take, the auto-close and
+    // the button-mode handover all behave exactly as they would after a real big win.
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    private static readonly bool DebugShowBigWinOnStart = true;
+    private const float DebugBigWinDelay = 1f;
+    private const double DebugBigWinAmount = 1234.56;
+
+    private IEnumerator DebugShowBigWinAfterStart()
+    {
+        yield return new WaitForSeconds(DebugBigWinDelay);
+
+        // Only on an idle board — never over a spin that started in the meantime.
+        if (gameManager == null || gameManager.currentState != GameState.Idle || isSpecialWinActive) yield break;
+
+        Debug.Log($"[UIManager] DEBUG: showing the big-win popup for testing ({DebugBigWinAmount}).");
+        ShowUniversalWinPopup(WinPopupType.BigWin, DebugBigWinAmount);
+    }
+#endif
 
     #endregion
 

@@ -100,9 +100,12 @@ public class ServerGenieWheelFeature
 public class ServerWheelSlice
 {
     public int sliceIndex;
-    public string type;       // "MULTIPLIER" or "FREE_GAMES"
-    public int multiplier;    // 0 on a FREE_GAMES slice
-    public int freeGames;     // 0 on a MULTIPLIER slice
+    public string type;       // "COIN", "MULTIPLIER" or "FREE_GAMES"
+    // Exactly one of these three is non-zero, matching the type. double for coin in case a fractional
+    // value is ever sent; every captured coin so far has been a whole number.
+    public double coin;
+    public int multiplier;
+    public int freeGames;
 }
 
 [Serializable]
@@ -248,10 +251,13 @@ public class ServerWheelResult
     // slice's own figures, so the client can cross-check what it is about to draw.
     public int sliceIndex;
     public string type;
+    public double coinAwarded;
     public int multiplierAwarded;
     public int freeGamesAwarded;
-    // multiplierAwarded x the TOTAL bet, even on a free spin (18 x 0.50 = 9.00). Already inside
-    // grandTotalWin.
+    // The prize in cash, already inside grandTotalWin. For a MULTIPLIER slice it is multiplierAwarded
+    // x the TOTAL bet, even on a free spin (x3 at a 10.00 bet = 30.00). What a COIN slice pays is not
+    // yet confirmed — no coin landing has been captured — which is exactly why the client always shows
+    // this figure rather than computing one.
     public double winInCash;
 }
 
@@ -351,6 +357,7 @@ public class SymbolInfo
 
 public enum WheelSliceType
 {
+    Coin,
     Multiplier,
     FreeGames
 }
@@ -360,7 +367,9 @@ public class WheelSlice
 {
     public int sliceIndex;
     public WheelSliceType type;
-    // Times the TOTAL bet. 0 on a free-games slice.
+    // The coin value as the init sends it. What it pays in cash is unconfirmed (see ServerWheelResult).
+    public double coin;
+    // Times the TOTAL bet.
     public int multiplier;
     public int freeGames;
 }
@@ -462,11 +471,12 @@ public class GenieWheelData
     // Indexes GameConfig.wheelSlices.
     public int sliceIndex;
     public WheelSliceType type;
-    // Times the total bet; 0 for a free-games slice.
-    public int multiplier;
-    // Spins awarded; 0 for a multiplier slice.
-    public int freeGames;
-    // The cash prize, already inside SpinResult.winAmount.
+    // Only the one matching the type is non-zero.
+    public double coin;
+    public int multiplier;       // times the total bet
+    public int freeGames;        // spins awarded
+    // The cash prize, already inside SpinResult.winAmount. Always the server's figure — show this,
+    // never a value derived from coin or multiplier.
     public double winAmount;
 }
 
@@ -610,7 +620,8 @@ public static class InitDataConverter
             slices.Add(new WheelSlice
             {
                 sliceIndex = serverSlice.sliceIndex,
-                type = ParseSliceType(serverSlice.type, serverSlice.freeGames, "wheel slice " + serverSlice.sliceIndex),
+                type = ParseSliceType(serverSlice.type, serverSlice.coin, serverSlice.freeGames, "wheel slice " + serverSlice.sliceIndex),
+                coin = serverSlice.coin,
                 multiplier = serverSlice.multiplier,
                 freeGames = serverSlice.freeGames
             });
@@ -620,16 +631,23 @@ public static class InitDataConverter
         return slices;
     }
 
-    private static WheelSliceType ParseSliceType(string type, int freeGames, string source)
+    // An unknown type is read from whichever figure is non-zero, and logged — the backend has added a
+    // slice kind this client doesn't know. The amount paid is unaffected either way, since the client
+    // always shows the server's winInCash; only how the wheel describes the slice would be wrong.
+    private static WheelSliceType ParseSliceType(string type, double coin, int freeGames, string source)
     {
         switch ((type ?? string.Empty).Trim().ToUpperInvariant())
         {
+            case "COIN":       return WheelSliceType.Coin;
             case "MULTIPLIER": return WheelSliceType.Multiplier;
             case "FREE_GAMES": return WheelSliceType.FreeGames;
         }
 
-        UnityEngine.Debug.LogError($"[InitDataConverter] {source} has unrecognised type '{type}' — read as {(freeGames > 0 ? "free games" : "a multiplier")} from its figures.");
-        return freeGames > 0 ? WheelSliceType.FreeGames : WheelSliceType.Multiplier;
+        WheelSliceType guess = freeGames > 0 ? WheelSliceType.FreeGames
+                             : coin > 0      ? WheelSliceType.Coin
+                             : WheelSliceType.Multiplier;
+        UnityEngine.Debug.LogError($"[InitDataConverter] {source} has unrecognised type '{type}' — read as {guess} from its figures.");
+        return guess;
     }
 
     internal static PlayerData ConvertToPlayerData(ServerPlayer serverPlayer, int defaultBetIndex = 0)
@@ -716,7 +734,8 @@ public static class InitDataConverter
         var result = serverWheel.result;
         data.triggered = true;
         data.sliceIndex = result.sliceIndex;
-        data.type = ParseSliceType(result.type, result.freeGamesAwarded, "genieWheel result");
+        data.type = ParseSliceType(result.type, result.coinAwarded, result.freeGamesAwarded, "genieWheel result");
+        data.coin = result.coinAwarded;
         data.multiplier = result.multiplierAwarded;
         data.freeGames = result.freeGamesAwarded;
         data.winAmount = result.winInCash;
