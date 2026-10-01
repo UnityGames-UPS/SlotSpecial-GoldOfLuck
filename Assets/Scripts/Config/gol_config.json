@@ -240,7 +240,7 @@
           "probability": 0.1062
         },
         {
-          "coin": 0,
+          "coin": 2,
           "type": "MULTIPLIER",
           "freeGames": 0,
           "multiplier": 2,
@@ -254,7 +254,7 @@
           "probability": 0.0663
         },
         {
-          "coin": 0,
+          "coin": 8,
           "type": "MULTIPLIER",
           "freeGames": 0,
           "multiplier": 3,
@@ -282,7 +282,7 @@
           "probability": 0.0332
         },
         {
-          "coin": 0,
+          "coin": 4,
           "type": "MULTIPLIER",
           "freeGames": 0,
           "multiplier": 10,
@@ -296,7 +296,7 @@
           "probability": 0.0862
         },
         {
-          "coin": 0,
+          "coin": 16,
           "type": "MULTIPLIER",
           "freeGames": 0,
           "multiplier": 2,
@@ -324,7 +324,7 @@
           "probability": 0.0212
         },
         {
-          "coin": 0,
+          "coin": 12,
           "type": "MULTIPLIER",
           "freeGames": 0,
           "multiplier": 5,
@@ -338,7 +338,7 @@
           "probability": 0.0597
         },
         {
-          "coin": 0,
+          "coin": 20,
           "type": "MULTIPLIER",
           "freeGames": 0,
           "multiplier": 3,
