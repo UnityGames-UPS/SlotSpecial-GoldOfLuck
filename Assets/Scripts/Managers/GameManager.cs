@@ -10,16 +10,17 @@ public class GameManager : MonoBehaviour
     [SerializeField] private PopupManager popupManager;
     [SerializeField] private SlotView slotView;
     [SerializeField] private FreeGameView freeGameView;
+    [SerializeField] private GenieWheelView genieWheelView;
 
     [Header("Spin Settings")]
     [SerializeField] private float normalSpinDuration = 3.5f;
     [SerializeField] private float turboSpinDuration = 2.0f;
     [SerializeField] private float quickSpinCycleDuration = 0.1f;
 
-    [Header("Free Games Timing")]
-    [Tooltip("How long the scatters animate before the award prompt or, on a retrigger, before the counter climbs.")]
+    [Header("Feature Timing")]
+    [Tooltip("How long the Lamps animate before the Genie Wheel's full-screen transition or, on a retrigger, before the counter climbs.")]
     [SerializeField] private float scatterTriggerHold = 3.5f;
-    [Tooltip("Scatter animation loops on a retrigger. The initial trigger uses 0 (runs until the first free spin starts) because the player controls when that ends.")]
+    [Tooltip("Lamp animation loops on a Genie Wheel trigger and on a retrigger. Time-based: each is SlotView's winSymbolLoopDuration.")]
     [SerializeField] private int scatterTriggerLoops = 2;
 
     [Header("Win Settings")]
@@ -27,20 +28,16 @@ public class GameManager : MonoBehaviour
     // the one that runs — this default only matters for a fresh component. Kept equal to the scene.
     [SerializeField] private double bigWinMultiplierThreshold = 10.0;
 
-    // Master switch for the Free Games round, OFF while the backend binding is brought up. Off means
-    // the round is never entered: the trigger spin is presented as an ordinary spin and
-    // ProcessSpinResult carries on. Nothing is removed — the view, the round state and the lifecycle
-    // below are all intact, so flipping this to true restores the feature as it was.
-    //
-    // Off is not a clean state against the live server. A wheel landing on a free-games slice still
-    // puts the SERVER into a round, which this client then plays as normal spins: the server treats
-    // them as free, so the balance ends up right, but the optimistic bet deduction in StartSpin is
-    // overwritten by the balance the response carries, so it flickers.
+    // Master switch for the Free Games round. The round is only ever entered from a Genie Wheel
+    // free-games landing. Off, that landing is presented like a cash landing with nothing to pay, and
+    // the server's free spins are then played as ordinary spins: the balance ends up right, but the
+    // optimistic bet deduction in StartSpin is overwritten by the balance each response carries, so it
+    // flickers. On is the only clean state against the live server.
     //
     // Un-serialized on purpose, like the other tuning constants: a serialized flag would be
     // overridden by whatever the scene saved. static readonly rather than const so the compiler does
     // not flag the code behind the switch as unreachable.
-    internal static readonly bool FreeGamesEnabled = false;
+    internal static readonly bool FreeGamesEnabled = true;
 
     internal GameConfig gameConfig;
     internal PlayerData playerData;
@@ -55,7 +52,7 @@ public class GameManager : MonoBehaviour
     internal bool isAutoPlaying;
     internal int autoPlayTotalRounds;
     internal int autoPlayRemainingRounds;
-    internal bool wasAutoPlayingBeforeFreeSpins;
+    internal bool wasAutoPlayingBeforeFeature;
     internal int savedAutoPlayRemainingRounds;
     internal int savedAutoPlayTotalRounds;
 
@@ -72,6 +69,21 @@ public class GameManager : MonoBehaviour
     // The total the counter was showing before a retrigger landed, so its count-up has somewhere to
     // start from. -1 when no retrigger is pending presentation.
     private int retriggerTotalBefore = -1;
+
+    // The Genie Wheel owns the round from the trigger spin landing until its payout has been
+    // presented (a cash landing) or the free-games round has been entered.
+    internal bool isInGenieWheel;
+
+    // The trigger spin is paid in two stages (genieWheel.md §3.10): at the trigger the balance and
+    // win box show everything EXCEPT the wheel prize, which is added once the feature presents it.
+    // Both stages are server figures — the interim balance is the server's balance minus the
+    // server's prize. playerData itself always holds the true balance; only the display waits.
+    internal bool withholdWheelPrize;
+    private double heldWheelPrize;
+    internal double DisplayBalance => withholdWheelPrize ? playerData.balance - heldWheelPrize : playerData.balance;
+
+    private bool wheelStartPressed;
+    private System.Action pendingWinnerTake;
 
     internal bool isInitialized;
     internal bool initializationFailed;
@@ -101,6 +113,8 @@ public class GameManager : MonoBehaviour
         {
             slotView.SetInitialMatrix(initialMatrix);
         }
+
+        if (genieWheelView != null) genieWheelView.SetSlices(config.wheelSlices, GetTotalPay());
 
         isInitialized = true;
         currentState = GameState.Idle;
@@ -166,6 +180,7 @@ public class GameManager : MonoBehaviour
         UpdateBetAmount();
         uiManager.UpdateBetDisplay();
         if (slotView != null) slotView.OnBetChanged();
+        if (genieWheelView != null) genieWheelView.OnBetChanged(GetTotalPay());
     }
 
     private void UpdateBetAmount()
@@ -311,6 +326,16 @@ public class GameManager : MonoBehaviour
             };
         }
 
+        // Decided once, here, before anything displays the balance: from this point the wheel's
+        // prize is held back, and the wheel stops dead as the Lamps land.
+        if (IsGenieWheelTrigger(lastResult))
+        {
+            isInGenieWheel = true;
+            heldWheelPrize = lastResult.genieWheel.winAmount;
+            withholdWheelPrize = true;
+            if (genieWheelView != null) genieWheelView.Freeze();
+        }
+
         // Kept as its own method, and reached by a plain call: anything that has to alter the board
         // between the reels landing and the win being presented belongs BEFORE this, running
         // PresentSpinOutcome from its own completion callback rather than alongside it. The board
@@ -321,16 +346,13 @@ public class GameManager : MonoBehaviour
     // Everything that happens once the board is final.
     private void PresentSpinOutcome()
     {
-        // A spin that awards Free Games is not over once its outcome is presented: the Scatters
-        // still celebrate for scatterTriggerHold, and only then does ProcessSpinResult enter the
-        // round. Returning to Idle here left that whole hold open to a Spin press, which entered
-        // the round early and started a free spin with no prompt — and when the hold ended,
-        // ProcessSpinResult consumed THAT spin's result, leaving its reels spinning forever.
-        //
-        // So the controller stays out of Idle until the round is entered. Every spin, bet and
-        // autoplay entry point already refuses anything but Idle; whatever enters the round —
-        // StartFreeSpins today — is what puts it back.
-        GameState settledState = IsFreeGamesTrigger(lastResult) ? GameState.ShowingWin : GameState.Idle;
+        // A Genie Wheel trigger is not presented as a win at all — see PresentGenieWheelTrigger.
+        if (isInGenieWheel)
+        {
+            PresentGenieWheelTrigger();
+            return;
+        }
+
 
         if (lastResult != null && lastResult.winAmount > 0 && lastResult.winLines != null && lastResult.winLines.Count > 0)
         {
@@ -340,7 +362,7 @@ public class GameManager : MonoBehaviour
             if (multiplier >= bigWinMultiplierThreshold)
             {
                 uiManager.DisableControlsDuringWinAnimation();
-                currentState = settledState;
+                currentState = GameState.Idle;
                 slotView.ShowWinLineAnimation(lastResult.winLines, OnWinAnimationComplete);
                 StartCoroutine(TriggerWinPopupWithDelay(1.5f, lastResult));
             }
@@ -350,14 +372,14 @@ public class GameManager : MonoBehaviour
                 uiManager.OnSpinStopping(lastResult);
                 uiManager.EnableControlsAfterWinAnimation();
                 uiManager.OnSpinCompleted(lastResult);
-                currentState = settledState;
+                currentState = GameState.Idle;
                 slotView.ShowWinLineAnimation(lastResult.winLines, OnWinAnimationComplete);
             }
         }
         else
         {
             uiManager.OnSpinStopping(lastResult);
-            currentState = settledState;
+            currentState = GameState.Idle;
 
             // Still handed to the view, just with nothing to present. A losing spin can arrive with
             // presentation state already raised — something earlier in the spin may have put the dim
@@ -426,15 +448,9 @@ public class GameManager : MonoBehaviour
             yield return null;
         }
 
-        // The initial trigger — a paid base spin that awarded spins. Its scatter sequence runs
-        // before the round is entered.
-        if (FreeGamesEnabled && lastResult != null && lastResult.freeGame != null
-            && lastResult.freeGame.spinsAwarded && !lastResult.freeGame.isFreeGame)
-        {
-            yield return StartCoroutine(DelayScatterTriggerResult());
-            yield break;
-        }
-
+        // The initial trigger never comes through here: a Genie Wheel trigger is taken over in
+        // PresentSpinOutcome, and Free Games is only entered from the wheel.
+        //
         // A retrigger — same scatter sequence, then the counter's total climbs to its new figure.
         // No prompt and no Start button; the round simply carries on.
         if (isInFreeSpins && retriggerTotalBefore >= 0)
@@ -473,27 +489,6 @@ public class GameManager : MonoBehaviour
         {
             ProcessSpinResult();
         }
-    }
-
-    private IEnumerator DelayScatterTriggerResult()
-    {
-        // Nothing is pressable during the hold — PresentSpinOutcome kept the controller out of
-        // Idle for it — so the button should not look pressable either. A trigger that paid a line
-        // has just had its controls re-enabled by the win path. ProcessSpinResult below brings them
-        // back, and StartFreeSpins then puts Start up in the same frame.
-        uiManager.DisableControlsDuringWinAnimation();
-
-        // Play special feature trigger sound AFTER all reels have stopped
-        AudioManager.Instance?.PlayScatterTrigger();
-
-        // Animate the scatters indefinitely (0 = no self-stop) so they keep playing behind the
-        // award prompt while the player decides to press Start. The first free spin's StartSpin
-        // stops them.
-        slotView.AnimateAllScatters(0);
-
-        // Wait for scatter hit animations to play
-        yield return new WaitForSeconds(scatterTriggerHold);
-        ProcessSpinResult();
     }
 
     private IEnumerator DelayBeforeNextRound()
@@ -561,35 +556,16 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    // A trigger is a spin that awarded spins while not itself being a free spin — the awarding
-    // spin is an ordinary paid base spin. A retrigger has spinsAwarded set too, but with
-    // isFreeGame true, and needs nothing: the extra spins are already in spinsRemaining.
-    //
-    // One test for both places that care — PresentSpinOutcome holding the controller out of Idle
-    // and ProcessSpinResult entering the round — so the hold can never outlast the entry.
-    private bool IsFreeGamesTrigger(SpinResult result)
-    {
-        return FreeGamesEnabled && !isInFreeSpins && result != null && result.freeGame != null
-            && result.freeGame.spinsAwarded && !result.freeGame.isFreeGame;
-    }
-
     private void ProcessSpinResult()
     {
         playerData = lastResult.playerData;
 
         uiManager.OnSpinCompleted(lastResult);
 
-        // This is the single place a round is entered or advanced. A feature added here should end
-        // its round on the server's own "still active" flag, never on a spins-remaining counter
-        // reaching zero — a round can close on the very spin that reset its counter, so the two do
-        // not agree.
-        if (IsFreeGamesTrigger(lastResult))
-        {
-            StartFreeSpins(lastResult.freeGame.spinsRemaining);
-            lastResult = null;
-            return;
-        }
-
+        // This is where a round is advanced; the Genie Wheel is the one place a round is entered. A
+        // feature added here should end its round on the server's own "still active" flag, never on
+        // a spins-remaining counter reaching zero — a round can close on the very spin that reset its
+        // counter, so the two do not agree.
         lastResult = null;
 
         if (isAutoPlaying && !isInFreeSpins)
@@ -674,7 +650,7 @@ public class GameManager : MonoBehaviour
         isAutoPlaying = true;
         autoPlayTotalRounds = rounds;
         autoPlayRemainingRounds = rounds;
-        wasAutoPlayingBeforeFreeSpins = false;
+        wasAutoPlayingBeforeFeature = false;
 
         uiManager.OnAutoPlayStarted();
         RequestSpin();
@@ -684,7 +660,7 @@ public class GameManager : MonoBehaviour
     {
         isAutoPlaying = false;
         autoPlayRemainingRounds = 0;
-        wasAutoPlayingBeforeFreeSpins = false;
+        wasAutoPlayingBeforeFeature = false;
 
         uiManager.OnAutoPlayStopped();
 
@@ -694,9 +670,9 @@ public class GameManager : MonoBehaviour
         //
         // Feature rounds are excluded. A round that parks autoplay before it begins may well have
         // paid a line on its triggering spin, and cycling those lines here would run them underneath
-        // the feature intro for its whole duration. The same goes for a Free Games trigger still
-        // holding for its Scatters (ShowingWin): the cycle would tear the Scatter celebration down
-        // and then loop under the Start prompt.
+        // the feature intro for its whole duration. The same goes for a Genie Wheel trigger, which
+        // parks autoplay in ShowingWin: the cycle would tear the Lamp celebration down and animate a
+        // ways win the trigger deliberately does not present.
         if (!isInFreeSpins && currentState != GameState.ShowingWin && slotView != null)
         {
             slotView.PlayWinLineCycle();
@@ -705,7 +681,7 @@ public class GameManager : MonoBehaviour
 
     internal bool ShouldResumeAutoPlay()
     {
-        return wasAutoPlayingBeforeFreeSpins && (savedAutoPlayTotalRounds == -1 || savedAutoPlayRemainingRounds > 0);
+        return wasAutoPlayingBeforeFeature && (savedAutoPlayTotalRounds == -1 || savedAutoPlayRemainingRounds > 0);
     }
 
     internal void ResumeAutoPlay()
@@ -714,7 +690,7 @@ public class GameManager : MonoBehaviour
 
         int remaining = savedAutoPlayRemainingRounds;
         int total = savedAutoPlayTotalRounds;
-        wasAutoPlayingBeforeFreeSpins = false;
+        wasAutoPlayingBeforeFeature = false;
 
         if (currentState != GameState.Idle) return;
 
@@ -735,11 +711,255 @@ public class GameManager : MonoBehaviour
 
     #endregion
 
+    #region Genie Wheel
+
+    // Three Lamps on reels 3-5. The server has already resolved the wheel inside this same response,
+    // so everything the feature presents is known now. A trigger during free spins is possible on the
+    // server but not supported yet (ToDo.md): it is logged and presented as an ordinary free spin.
+    private bool IsGenieWheelTrigger(SpinResult result)
+    {
+        if (result == null || result.genieWheel == null || !result.genieWheel.triggered) return false;
+
+        if (isInFreeSpins)
+        {
+            Debug.LogWarning("[GameManager] Genie Wheel triggered during free spins — not supported yet, presented as an ordinary spin. See ToDo.md.");
+            return false;
+        }
+
+        return true;
+    }
+
+    // The trigger spin owns the screen. Its ways win, if any, goes straight into the win box and the
+    // balance with no animation and no big-win check — the wheel's prize is still held back. The
+    // controller stays out of Idle for the whole feature, so every spin, bet and autoplay entry point
+    // refuses input, and the buttons are locked to match.
+    private void PresentGenieWheelTrigger()
+    {
+        // Before the suspend: StopAutoPlay replays the win-line cycle unless the state is ShowingWin.
+        currentState = GameState.ShowingWin;
+        SuspendAutoPlayForFeature();
+
+        uiManager.OnSpinStopping(lastResult);
+        uiManager.DisableControlsDuringWinAnimation();
+        uiManager.SetFeatureButtonLock(true);
+
+        StartCoroutine(GenieWheelRoutine(lastResult));
+    }
+
+    private IEnumerator GenieWheelRoutine(SpinResult result)
+    {
+        GenieWheelData wheel = result.genieWheel;
+
+        // 1. The Lamps celebrate.
+        AudioManager.Instance?.PlayScatterTrigger();
+        if (slotView != null) slotView.AnimateAllScatters(scatterTriggerLoops);
+        yield return new WaitForSeconds(scatterTriggerHold);
+
+        // 2. The full-screen animations. The board is cleared, and the stage swapped, beneath the
+        //    first one's held frame.
+        if (genieWheelView != null)
+        {
+            bool entered = false;
+            genieWheelView.PlayEntryTransition(ClearTriggerBoard, () => entered = true);
+            yield return new WaitUntil(() => entered);
+            genieWheelView.ShowAwaitingStart();
+        }
+        else
+        {
+            ClearTriggerBoard();
+        }
+
+        // 3. Start. Autoplay is suspended, so only the player can press it.
+        wheelStartPressed = false;
+        uiManager.SetSpinButtonMode(UIManager.SpinButtonMode.GenieWheelStart);
+        yield return new WaitUntil(() => wheelStartPressed);
+        uiManager.ReleaseSpinButton(interactable: false);
+
+        // 4. The sweep, then the spin onto the slice the server already chose.
+        if (genieWheelView != null)
+        {
+            bool swept = false;
+            genieWheelView.PlayUndimSweep(() => swept = true);
+            yield return new WaitUntil(() => swept);
+
+            bool landed = false;
+            genieWheelView.SpinToSlice(wheel.sliceIndex, () => landed = true);
+            yield return new WaitUntil(() => landed);
+        }
+
+        if (wheel.type == WheelSliceType.FreeGames && FreeGamesEnabled)
+        {
+            yield return FreeGamesLandingRoutine(result);
+        }
+        else
+        {
+            yield return CashLandingRoutine(result);
+        }
+    }
+
+    private void ClearTriggerBoard()
+    {
+        if (slotView != null) slotView.ClearTriggerAnimation();
+    }
+
+    // Coin or multiplier (genieWheel.md §3.7a): back to base under the dim, THEN the prize is paid —
+    // balance, win box and Winner panel — and Take ends the feature.
+    private IEnumerator CashLandingRoutine(SpinResult result)
+    {
+        GenieWheelData wheel = result.genieWheel;
+
+        if (genieWheelView != null)
+        {
+            bool reset = false;
+            genieWheelView.PlayDimTransition(() => genieWheelView.ResetStageToBase(keepFeatureBackground: false), () => reset = true);
+            yield return new WaitUntil(() => reset);
+        }
+
+        // Second stage of the payout. The win box shows the wheel's prize alone — the server's
+        // winInCash, never a figure read off the wheel.
+        withholdWheelPrize = false;
+        heldWheelPrize = 0;
+        uiManager.UpdateBalanceDisplay();
+        uiManager.ShowWinAmount(wheel.winAmount);
+
+        if (wheel.winAmount > 0)
+        {
+            yield return WinnerPanelRoutine(wheel.winAmount);
+        }
+
+        FinishGenieWheelCash();
+    }
+
+    // Free games (genieWheel.md §3.7b): congratulations, then under the dim the wheel resets and the
+    // slot returns while the special background stays, and the round waits for its own Start.
+    private IEnumerator FreeGamesLandingRoutine(SpinResult result)
+    {
+        GenieWheelData wheel = result.genieWheel;
+
+        // The counter runs on the server's figure; the congratulations panel shows the wheel's award.
+        // They should always agree — said out loud if they ever don't.
+        int spins = result.freeGame != null ? result.freeGame.spinsRemaining : wheel.freeGames;
+        if (spins != wheel.freeGames)
+        {
+            Debug.LogWarning($"[GameManager] Wheel awarded {wheel.freeGames} free games but the round reports {spins} remaining. The counter follows the round.");
+        }
+
+        if (freeGameView != null)
+        {
+            bool closed = false;
+            freeGameView.ShowCongratulations(wheel.freeGames, () => closed = true);
+            yield return new WaitUntil(() => closed);
+        }
+
+        // A free-games landing pays nothing itself, so there is no second payout stage.
+        withholdWheelPrize = false;
+        heldWheelPrize = 0;
+
+        System.Action underCover = () =>
+        {
+            if (genieWheelView != null) genieWheelView.ResetStageToBase(keepFeatureBackground: true);
+            StartFreeSpins(spins);
+        };
+
+        if (genieWheelView != null)
+        {
+            bool entered = false;
+            genieWheelView.PlayDimTransition(underCover, () => entered = true);
+            yield return new WaitUntil(() => entered);
+        }
+        else
+        {
+            underCover();
+        }
+
+        // Free Games owns the round from here. Cleared before Start is pressable, as ProcessSpinResult
+        // would — StartSpin would otherwise process this result a second time.
+        isInGenieWheel = false;
+        lastResult = null;
+
+        uiManager.SetSpinButtonMode(UIManager.SpinButtonMode.FreeGamesStart);
+
+        // Idle while the round waits for Start, as Free Games always has: the locked buttons and the
+        // Start mode are what hold it, and Start's RequestSpin needs Idle.
+        currentState = GameState.Idle;
+    }
+
+    // Opens the Winner panel, makes Take pressable once the count-up finishes, and waits for it.
+    // With no wheel view there is no panel to take, so nothing waits.
+    private IEnumerator WinnerPanelRoutine(double amount)
+    {
+        if (genieWheelView == null) yield break;
+
+        bool taken = false;
+        pendingWinnerTake = () => taken = true;
+        genieWheelView.ShowWinner(amount, () => uiManager.SetSpinButtonMode(UIManager.SpinButtonMode.WinnerTake));
+        yield return new WaitUntil(() => taken);
+
+        bool closed = false;
+        genieWheelView.CloseWinner(() => closed = true);
+        yield return new WaitUntil(() => closed);
+    }
+
+    // Deliberately not ProcessSpinResult: its OnSpinCompleted would put the spin's grand total in the
+    // win box, where the wheel's prize alone belongs.
+    private void FinishGenieWheelCash()
+    {
+        isInGenieWheel = false;
+        lastResult = null;
+
+        uiManager.SetFeatureButtonLock(false);
+        // Off the explicit Take mode without SetSpinButtonMode(Spin), which would clear the win box.
+        uiManager.ReleaseSpinButton(interactable: true);
+        uiManager.EnableControlsAfterWinAnimation();
+
+        currentState = GameState.Idle;
+
+        if (ShouldResumeAutoPlay())
+        {
+            ResumeAutoPlay();
+        }
+    }
+
+    // Routed here by UIManager's GenieWheelStart mode.
+    internal void OnGenieWheelStartPressed()
+    {
+        if (!isInGenieWheel) return;
+        wheelStartPressed = true;
+    }
+
+    // Routed here by UIManager's WinnerTake mode — the Winner panel of either a cash landing or the
+    // end of Free Games.
+    internal void OnWinnerTakePressed()
+    {
+        var callback = pendingWinnerTake;
+        pendingWinnerTake = null;
+        callback?.Invoke();
+    }
+
+    // A feature parks autoplay for its whole length: Start and Take are the player's to press. The
+    // trigger spin never reaches ProcessSpinResult's per-round decrement, so it is counted here.
+    // StopAutoPlay clears the resume flag, so it is set after.
+    private void SuspendAutoPlayForFeature()
+    {
+        if (!isAutoPlaying) return;
+
+        int prevTotal = autoPlayTotalRounds;
+        int prevRemaining = autoPlayRemainingRounds;
+
+        StopAutoPlay();
+
+        wasAutoPlayingBeforeFeature = true;
+        savedAutoPlayTotalRounds = prevTotal;
+        savedAutoPlayRemainingRounds = (prevTotal != -1) ? (prevRemaining - 1) : -1;
+    }
+
+    #endregion
+
     #region Free Spins
 
-    // Entered from a base spin that awarded spins. There is no pick and no player choice over the
-    // prize — Golden Dynasty awards a flat count on 3+ scatters — but the player does choose when
-    // the round begins, via the Start button that replaces Spin.
+    // Entered only from a Genie Wheel free-games landing, beneath the full-screen dim. Autoplay was
+    // already suspended at the wheel's trigger and resumes when this round ends. The player chooses
+    // when the round begins, via the Start button that replaces Spin once the dim clears.
     private void StartFreeSpins(int spins)
     {
         isInFreeSpins = true;
@@ -750,44 +970,22 @@ public class GameManager : MonoBehaviour
 
         AudioManager.Instance?.PlayFreeSpinBg();
 
-        int prevTotal = autoPlayTotalRounds;
-        int prevRemaining = autoPlayRemainingRounds;
-
-        if (isAutoPlaying)
-        {
-            StopAutoPlay();
-            wasAutoPlayingBeforeFreeSpins = true;
-            savedAutoPlayTotalRounds = prevTotal;
-            savedAutoPlayRemainingRounds = (prevTotal != -1) ? (prevRemaining - 1) : -1;
-        }
-
-        // The prompt pulses until the player acts; the scatters keep animating underneath it,
-        // started by DelayScatterTriggerResult and stopped by the first free spin.
-        if (freeGameView != null) freeGameView.ShowAwardPrompt();
-
-        uiManager.SetFreeGamesButtonLock(true);
-        uiManager.SetSpinButtonMode(UIManager.SpinButtonMode.FreeGamesStart);
-
-        currentState = GameState.Idle;
+        if (freeGameView != null) freeGameView.ShowCounter(freeSpinsRemaining, FreeSpinsTotalAwarded);
     }
 
-    // The Start button — routed here by UIManager's FreeGamesStart mode. The prompt becomes the
-    // counter, the total counts up from 0, and the first spin follows.
+    // The Start button — routed here by UIManager's FreeGamesStart mode.
     internal void StartFirstFreeSpin()
     {
         // Off FreeGamesStart and onto plain Spin, disabled. Two reasons: the round should show the
         // ordinary Spin button greyed out rather than a Start button that has already been pressed,
         // and FreeGamesStart is an "explicit" mode that SetSpinStopButtonStates refuses to touch —
-        // so leaving it set would freeze the button's art for the whole round.
+        // so leaving it set would freeze the button's art for the whole round. It also zeroes the win
+        // box, which from here shows the round's running total.
         uiManager.SetSpinButtonMode(UIManager.SpinButtonMode.Spin, interactable: false);
 
-        if (freeGameView == null)
-        {
-            StartCoroutine(DelayBeforeFirstFreeSpin());
-            return;
-        }
+        if (freeGameView != null) freeGameView.OnFreeSpinsStarted();
 
-        freeGameView.PlayCounterIntro(FreeSpinsTotalAwarded, () => StartCoroutine(DelayBeforeFirstFreeSpin()));
+        StartCoroutine(DelayBeforeFirstFreeSpin());
     }
 
     private IEnumerator DelayBeforeFirstFreeSpin()
@@ -809,35 +1007,47 @@ public class GameManager : MonoBehaviour
         RequestSpin();
     }
 
+    // The round is over. The Winner panel counts the round's total up BEFORE the fade back to base —
+    // the reverse of a cash landing — and Take both closes it and starts the fade.
+    //
+    // The last spin's lines are not cycled here, unlike Golden Dynasty: free spins show no line walk
+    // (genieWheel.md §3.7b), and the cycle would carry on over the base game after the fade.
     private void EndFreeSpins()
     {
         double roundWin = freeSpinsRoundWin;
 
         isInFreeSpins = false;
         freeSpinsRemaining = 0;
-        AudioManager.Instance?.PlayMainBg();
 
-        // Free spins skip the per-line cycle, so the final spin is parked after Phase 1. Start it
-        // here so it plays on the reels beneath the closing summary rather than making the player
-        // wait for it afterwards. Must come after isInFreeSpins is cleared — PlayWinLineCycle is a
-        // no-op during free spins.
-        if (slotView != null) slotView.PlayWinLineCycle();
+        // Out of Idle until the round has been taken and faded away.
+        currentState = GameState.ShowingWin;
 
-        if (freeGameView != null)
+        StartCoroutine(FreeGamesEndRoutine(roundWin));
+    }
+
+    private IEnumerator FreeGamesEndRoutine(double roundWin)
+    {
+        yield return WinnerPanelRoutine(roundWin);
+
+        System.Action underCover = () =>
         {
-            freeGameView.PlayOutroSequence(roundWin, OnFreeGamesCountUpComplete, OnFreeGamesOutroComplete);
+            if (genieWheelView != null) genieWheelView.SetFeatureBackground(false);
+            if (freeGameView != null) freeGameView.HideCounter();
+            AudioManager.Instance?.PlayMainBg();
+        };
+
+        if (genieWheelView != null)
+        {
+            bool faded = false;
+            genieWheelView.PlayDimTransition(underCover, () => faded = true);
+            yield return new WaitUntil(() => faded);
         }
         else
         {
-            OnFreeGamesOutroComplete();
+            underCover();
         }
-    }
 
-    // The summary's total has finished counting up — Take becomes pressable. FreeGameView owns
-    // what happens on the press and calls back through OnFreeGamesOutroComplete.
-    private void OnFreeGamesCountUpComplete()
-    {
-        uiManager.SetSpinButtonMode(UIManager.SpinButtonMode.FreeGamesTake);
+        OnFreeGamesOutroComplete();
     }
 
     // Player took the win and the closing fade finished — restore the base game.
@@ -848,7 +1058,7 @@ public class GameManager : MonoBehaviour
         retriggerTotalBefore = -1;
 
         uiManager.SetSpinButtonMode(UIManager.SpinButtonMode.Spin);
-        uiManager.SetFreeGamesButtonLock(false);
+        uiManager.SetFeatureButtonLock(false);
 
         currentState = GameState.Idle;
 
@@ -870,7 +1080,7 @@ public class GameManager : MonoBehaviour
             spinCoroutine = null;
         }
 
-        wasAutoPlayingBeforeFreeSpins = false;
+        wasAutoPlayingBeforeFeature = false;
         if (isAutoPlaying)
         {
             StopAutoPlay();

@@ -1121,9 +1121,8 @@ public class SlotView : MonoBehaviour
 
     #region Stop Symbol Animations
 
-    // loopCount <= 0 means "animate indefinitely" — used by the free-games trigger so the scatters
-    // keep playing through the whole intro/pick sequence. They're stopped by the first free spin's
-    // StartSpin -> KillAllTweens -> KillWinTweens.
+    // loopCount <= 0 means "animate indefinitely", until something calls KillWinTweens — the next
+    // StartSpin, or ClearTriggerAnimation. The Genie Wheel trigger and a retrigger both pass a count.
     internal void AnimateAllScatters(int loopCount)
     {
         if (currentDisplayMatrix == null) return;
@@ -1149,6 +1148,14 @@ public class SlotView : MonoBehaviour
                 }
             }
         }
+    }
+
+    // The Genie Wheel trigger's Lamp celebration is over and the board is about to be hidden behind
+    // the feature. Clears it now — the clips, the animation layer, the dim, the hidden reel icons —
+    // so SlotObject comes back after the feature showing a clean board, not a frozen celebration.
+    internal void ClearTriggerAnimation()
+    {
+        KillWinTweens();
     }
 
     // Plays one symbol's clip on the ANIMATION LAYER, the same surface AnimateWinPositions uses.
@@ -1299,6 +1306,10 @@ public class SlotView : MonoBehaviour
         // already running and has no separate trigger sequence to make way for.
         // Gated on the controller's master switch, so a feature that is switched off does not make
         // this skip the win presentation for a trigger the controller will never act on.
+        //
+        // In Gold of Luck this cannot currently fire. Free Games is only awarded by a Genie Wheel
+        // landing, and a wheel trigger spin never reaches this method — GameManager takes it over in
+        // PresentSpinOutcome. Kept, with its skip, for a trigger that does present through here.
         bool freeGamesTriggered = GameManager.FreeGamesEnabled && gameManager != null && gameManager.lastResult != null
             && gameManager.lastResult.freeGame != null
             && gameManager.lastResult.freeGame.spinsAwarded
