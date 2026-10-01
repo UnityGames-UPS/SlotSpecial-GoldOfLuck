@@ -66,9 +66,8 @@ public class GameManager : MonoBehaviour
     // self-corrects if a response is ever missed.
     internal int FreeSpinsTotalAwarded => freeSpinsUsed + freeSpinsRemaining;
 
-    // The total the counter was showing before a retrigger landed, so its count-up has somewhere to
-    // start from. -1 when no retrigger is pending presentation.
-    private int retriggerTotalBefore = -1;
+    // A retrigger landed and its Lamps have not been shown yet — the counter waits for them.
+    private bool retriggerPending;
 
     // The Genie Wheel owns the round from the trigger spin landing until its payout has been
     // presented (a cash landing) or the free-games round has been entered.
@@ -453,7 +452,7 @@ public class GameManager : MonoBehaviour
         //
         // A retrigger — same scatter sequence, then the counter's total climbs to its new figure.
         // No prompt and no Start button; the round simply carries on.
-        if (isInFreeSpins && retriggerTotalBefore >= 0)
+        if (isInFreeSpins && retriggerPending)
         {
             yield return StartCoroutine(PlayRetriggerSequence());
         }
@@ -463,20 +462,14 @@ public class GameManager : MonoBehaviour
 
     private IEnumerator PlayRetriggerSequence()
     {
-        int fromTotal = retriggerTotalBefore;
-        retriggerTotalBefore = -1;
-
+        retriggerPending = false;
 
         AudioManager.Instance?.PlayScatterTrigger();
         if (slotView != null) slotView.AnimateAllScatters(scatterTriggerLoops);
 
         yield return new WaitForSeconds(scatterTriggerHold);
 
-        if (freeGameView == null) yield break;
-
-        bool countUpDone = false;
-        freeGameView.AnimateTotalTo(freeSpinsRemaining, fromTotal, FreeSpinsTotalAwarded, () => countUpDone = true);
-        yield return new WaitUntil(() => countUpDone);
+        if (freeGameView != null) freeGameView.UpdateCounter(freeSpinsRemaining, FreeSpinsTotalAwarded);
     }
 
     private void ResumeAfterSpecialFeature()
@@ -536,18 +529,15 @@ public class GameManager : MonoBehaviour
         // spins into spinsRemaining, so the count simply goes up instead of down.
         if (isInFreeSpins && result.freeGame != null)
         {
-            int totalBefore = FreeSpinsTotalAwarded;
-
             freeSpinsUsed++;
             freeSpinsRemaining = result.freeGame.spinsRemaining;
             freeSpinsRoundWin = result.freeGame.roundWin;
 
-            // A retrigger animates the total up to its new figure; an ordinary spin just sets the
-            // counter. The retrigger's own count-up is started later, once the scatters have
-            // animated — this only records what it will count from.
+            // An ordinary spin sets the counter now. A retrigger's new total waits until its Lamps
+            // have animated — this only records that one is pending.
             if (result.freeGame.spinsAwarded)
             {
-                retriggerTotalBefore = totalBefore;
+                retriggerPending = true;
             }
             else if (freeGameView != null)
             {
@@ -872,16 +862,15 @@ public class GameManager : MonoBehaviour
             underCover();
         }
 
-        // Free Games owns the round from here. Cleared before Start is pressable, as ProcessSpinResult
-        // would — StartSpin would otherwise process this result a second time.
+        // Free Games owns the round from here, and it starts itself — there is no Start button.
+        // Cleared before the first spin, as ProcessSpinResult would: StartSpin would otherwise
+        // process this result a second time. Idle because RequestSpin needs it; the locked buttons
+        // and the greyed Spin button keep the player out.
         isInGenieWheel = false;
         lastResult = null;
-
-        uiManager.SetSpinButtonMode(UIManager.SpinButtonMode.FreeGamesStart);
-
-        // Idle while the round waits for Start, as Free Games always has: the locked buttons and the
-        // Start mode are what hold it, and Start's RequestSpin needs Idle.
         currentState = GameState.Idle;
+
+        StartCoroutine(DelayBeforeFirstFreeSpin());
     }
 
     // Opens the Winner panel, makes Take pressable once the count-up finishes, and waits for it.
@@ -958,34 +947,23 @@ public class GameManager : MonoBehaviour
     #region Free Spins
 
     // Entered only from a Genie Wheel free-games landing, beneath the full-screen dim. Autoplay was
-    // already suspended at the wheel's trigger and resumes when this round ends. The player chooses
-    // when the round begins, via the Start button that replaces Spin once the dim clears.
+    // already suspended at the wheel's trigger and resumes when this round ends. There is no Start
+    // button: the first spin follows once the dim clears, and the rest play themselves.
     private void StartFreeSpins(int spins)
     {
         isInFreeSpins = true;
         freeSpinsRemaining = spins;
         freeSpinsUsed = 0;
         freeSpinsRoundWin = 0;
-        retriggerTotalBefore = -1;
+        retriggerPending = false;
 
         AudioManager.Instance?.PlayFreeSpinBg();
 
         if (freeGameView != null) freeGameView.ShowCounter(freeSpinsRemaining, FreeSpinsTotalAwarded);
-    }
 
-    // The Start button — routed here by UIManager's FreeGamesStart mode.
-    internal void StartFirstFreeSpin()
-    {
-        // Off FreeGamesStart and onto plain Spin, disabled. Two reasons: the round should show the
-        // ordinary Spin button greyed out rather than a Start button that has already been pressed,
-        // and FreeGamesStart is an "explicit" mode that SetSpinStopButtonStates refuses to touch —
-        // so leaving it set would freeze the button's art for the whole round. It also zeroes the win
-        // box, which from here shows the round's running total.
+        // The plain Spin button, greyed out for the round. Also zeroes the win box, which from here
+        // shows the round's running total.
         uiManager.SetSpinButtonMode(UIManager.SpinButtonMode.Spin, interactable: false);
-
-        if (freeGameView != null) freeGameView.OnFreeSpinsStarted();
-
-        StartCoroutine(DelayBeforeFirstFreeSpin());
     }
 
     private IEnumerator DelayBeforeFirstFreeSpin()
@@ -1055,7 +1033,7 @@ public class GameManager : MonoBehaviour
     {
         freeSpinsUsed = 0;
         freeSpinsRoundWin = 0;
-        retriggerTotalBefore = -1;
+        retriggerPending = false;
 
         uiManager.SetSpinButtonMode(UIManager.SpinButtonMode.Spin);
         uiManager.SetFeatureButtonLock(false);

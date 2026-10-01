@@ -304,13 +304,14 @@ public class UIManager : MonoBehaviour
         {
             AudioManager.Instance?.PlayBgMusic();
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-            if (DebugShowBigWinOnStart) StartCoroutine(DebugShowBigWinAfterStart());
-#endif
+            // Big-win popup test trigger — commented out. Uncomment this and the block below to use it.
+//#if UNITY_EDITOR || DEVELOPMENT_BUILD
+//            if (DebugShowBigWinOnStart) StartCoroutine(DebugShowBigWinAfterStart());
+//#endif
         }
     }
 
-    // ── TEMPORARY: big-win popup test trigger ──────────────────────────────────────────────────
+    // ── TEMPORARY: big-win popup test trigger — COMMENTED OUT ──────────────────────────────────
     // Opens the big-win popup once, shortly after the game finishes initializing, so its open and loop
     // animations can be checked without having to land a qualifying win. Remove once the popup is
     // signed off (tracked in ToDo.md).
@@ -318,22 +319,22 @@ public class UIManager : MonoBehaviour
     // Compiled into the Editor and development builds only, so a release build can never show it even
     // if this is left on. It goes through the real ShowUniversalWinPopup, so Take, the auto-close and
     // the button-mode handover all behave exactly as they would after a real big win.
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-    private static readonly bool DebugShowBigWinOnStart = true;
-    private const float DebugBigWinDelay = 1f;
-    private const double DebugBigWinAmount = 1234.56;
+//#if UNITY_EDITOR || DEVELOPMENT_BUILD
+//    private static readonly bool DebugShowBigWinOnStart = true;
+//    private const float DebugBigWinDelay = 1f;
+//    private const double DebugBigWinAmount = 1234.56;
 
-    private IEnumerator DebugShowBigWinAfterStart()
-    {
-        yield return new WaitForSeconds(DebugBigWinDelay);
+//    private IEnumerator DebugShowBigWinAfterStart()
+//    {
+//        yield return new WaitForSeconds(DebugBigWinDelay);
 
-        // Only on an idle board — never over a spin that started in the meantime.
-        if (gameManager == null || gameManager.currentState != GameState.Idle || isSpecialWinActive) yield break;
+//        // Only on an idle board — never over a spin that started in the meantime.
+//        if (gameManager == null || gameManager.currentState != GameState.Idle || isSpecialWinActive) yield break;
 
-        Debug.Log($"[UIManager] DEBUG: showing the big-win popup for testing ({DebugBigWinAmount}).");
-        ShowUniversalWinPopup(WinPopupType.BigWin, DebugBigWinAmount);
-    }
-#endif
+//        Debug.Log($"[UIManager] DEBUG: showing the big-win popup for testing ({DebugBigWinAmount}).");
+//        ShowUniversalWinPopup(WinPopupType.BigWin, DebugBigWinAmount);
+//    }
+//#endif
 
     #endregion
 
@@ -689,12 +690,6 @@ public class UIManager : MonoBehaviour
     {
         switch (spinButtonMode)
         {
-            case SpinButtonMode.FreeGamesStart:
-                AudioManager.Instance?.PlayButton();
-                SetSpinButtonMode(SpinButtonMode.FreeGamesStart, interactable: false);
-                gameManager.StartFirstFreeSpin();
-                return;
-
             case SpinButtonMode.GenieWheelStart:
                 AudioManager.Instance?.PlayPrimaryActionButton();
                 ApplySpinButtonState(SpinButtonMode.GenieWheelStart, interactable: false);
@@ -1202,15 +1197,14 @@ public class UIManager : MonoBehaviour
     // spin object. All six are now modes on the same button.
     //
     // Modes that share art stay distinct because they answer to different owners: WinnerTake calls
-    // back into GameManager for the Genie Wheel's Winner panel, BigWinTake closes the popup, and the
-    // two Starts begin different things. A new feature that takes the button over wants its own mode
-    // for the same reason.
+    // back into GameManager for the Genie Wheel's Winner panel, BigWinTake closes the popup. A new
+    // feature that takes the button over wants its own mode for the same reason. (Free Games has no
+    // Start of its own — the round starts itself.)
     internal enum SpinButtonMode
     {
         Spin,
         Stop,
         AutoplayStop,
-        FreeGamesStart,
         BigWinTake,
         GenieWheelStart,
         WinnerTake
@@ -1219,12 +1213,12 @@ public class UIManager : MonoBehaviour
     private SpinButtonMode spinButtonMode = SpinButtonMode.Spin;
 
     // True while a mode was set explicitly by SetSpinButtonMode rather than derived from the spin
-    // state. SetSpinStopButtonStates must not stomp on those — the free-games summary and the
-    // big-win popup both hold the button in a mode across events that would otherwise reset it.
+    // state. SetSpinStopButtonStates must not stomp on those — the Genie Wheel's Start and Winner
+    // panel and the big-win popup all hold the button in a mode across events that would otherwise
+    // reset it.
     private static bool IsExplicitMode(SpinButtonMode mode)
     {
-        return mode == SpinButtonMode.FreeGamesStart
-            || mode == SpinButtonMode.BigWinTake
+        return mode == SpinButtonMode.BigWinTake
             || mode == SpinButtonMode.GenieWheelStart
             || mode == SpinButtonMode.WinnerTake;
     }
@@ -1265,7 +1259,6 @@ public class UIManager : MonoBehaviour
         {
             case SpinButtonMode.Stop:           set = stopSprites; break;
             case SpinButtonMode.AutoplayStop:   set = autoplayStopSprites; break;
-            case SpinButtonMode.FreeGamesStart:
             case SpinButtonMode.GenieWheelStart: set = startSprites; break;
             case SpinButtonMode.WinnerTake:
             case SpinButtonMode.BigWinTake:     set = takeSprites; break;

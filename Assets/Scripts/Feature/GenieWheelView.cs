@@ -271,11 +271,11 @@ public class GenieWheelView : MonoBehaviour
             switch (slice.type)
             {
                 case WheelSliceType.Coin:
-                    SetText(refs.amountText, (slice.coin * totalBet).ToString(SpriteTextFormatter.MoneyFormat));
+                    SetText(refs.amountText, Stacked((slice.coin * totalBet).ToString(SpriteTextFormatter.MoneyFormat)));
                     break;
 
                 case WheelSliceType.Multiplier:
-                    SetText(refs.amountText, (slice.multiplier * totalBet).ToString(SpriteTextFormatter.MoneyFormat));
+                    SetText(refs.amountText, Stacked((slice.multiplier * totalBet).ToString(SpriteTextFormatter.MoneyFormat)));
                     SetText(refs.multiplierText, "X" + slice.multiplier);
                     break;
 
@@ -285,6 +285,21 @@ public class GenieWheelView : MonoBehaviour
                     break;
             }
         }
+    }
+
+    // Cash amounts read down the wedge, one character per line: "1.05" becomes "1\n.\n0\n5". Only
+    // the cash — the multiplier badge and the free-games count stay on one line. The label grows
+    // with the bet (4 lines at the lowest, 7 for 3000.00 at the highest), so the AmountText boxes
+    // need room for 7 lines or TMP Auto Size.
+    private static string Stacked(string text)
+    {
+        var sb = new System.Text.StringBuilder(text.Length * 2);
+        for (int i = 0; i < text.Length; i++)
+        {
+            if (i > 0) sb.Append('\n');
+            sb.Append(text[i]);
+        }
+        return sb.ToString();
     }
 
     #endregion
