@@ -47,6 +47,18 @@ public class SlotView : MonoBehaviour
     [Tooltip("The Genie drawn with x4. Empty = a x4 Genie falls back to the plain Genie sprite.")]
     [SerializeField] private Sprite spriteGenie4;
 
+    // The numbered Genies' win animations, keyed by value the same way. Each is optional, and an
+    // unwired one does NOT fall back to the plain Genie clip (animSpritesGenie): that clip has no
+    // number on it, so the multiplier would vanish exactly while the Genie is paying. A winning
+    // numbered Genie with no clip simply stays on its numbered static sprite. See GetGenieAnimFrames.
+    [Header("Genie Multiplier Animations - Keyed by VALUE, not by symbol id")]
+    [Tooltip("Win animation for the x2 Genie. Empty = a winning x2 Genie stays on its static x2 sprite.")]
+    [SerializeField] private List<Sprite> animSpritesGenie2;
+    [Tooltip("Win animation for the x3 Genie. Empty = a winning x3 Genie stays on its static x3 sprite.")]
+    [SerializeField] private List<Sprite> animSpritesGenie3;
+    [Tooltip("Win animation for the x4 Genie. Empty = a winning x4 Genie stays on its static x4 sprite.")]
+    [SerializeField] private List<Sprite> animSpritesGenie4;
+
     // Rect size for each symbol whose art is not drawn to the 175 pitch, keyed by symbol id. Every
     // id not listed here uses normalSymbolSize.
     //
@@ -60,6 +72,16 @@ public class SlotView : MonoBehaviour
     // if the backend ever reorders it they have to be corrected together.
     private static readonly Dictionary<int, Vector2> SymbolSizeOverrides = new Dictionary<int, Vector2>
     {
+        {0, new Vector2(175f, 175f)},  // Prince
+        {1, new Vector2(175f, 175f)},  // Princess
+        {2, new Vector2(175f, 175f)},  // Camel
+        {3, new Vector2(175f, 175f)},  // Parrot
+        {4, new Vector2(175f, 175f)},  // Turban
+        {5, new Vector2(175f, 175f)},  // Carpet
+        {6, new Vector2(175f, 175f)},  // Sword
+        {7, new Vector2(175f, 175f)},  // Potion
+        {8, new Vector2(262.5f, 262.5f)},  // Genie (oversized)
+        {9, new Vector2(175f, 175f)}   // Lamp
     };
 
     // Playback speed per symbol, applied wherever that symbol's clip is assigned.
@@ -570,6 +592,28 @@ public class SlotView : MonoBehaviour
         if (!landedGenieMultipliers.TryGetValue(flatIndex, out int multiplier)) return null;
 
         return genieMultiplierSprites.TryGetValue(multiplier, out Sprite sprite) ? sprite : null;
+    }
+
+    /// <summary>
+    /// The win animation for the Genie in one cell, picked by the multiplier it landed with.
+    ///
+    /// A cell with a multiplier gets that value's clip, or null when it isn't wired — never the
+    /// plain clip, which would hide the number. Only a Genie the server attached no value to plays
+    /// the plain animSpritesGenie. Null means "no animation": the caller leaves the static sprite up.
+    /// </summary>
+    private List<Sprite> GetGenieAnimFrames(int flatIndex)
+    {
+        if (!landedGenieMultipliers.TryGetValue(flatIndex, out int multiplier)) return animSpritesGenie;
+
+        List<Sprite> frames = multiplier switch
+        {
+            2 => animSpritesGenie2,
+            3 => animSpritesGenie3,
+            4 => animSpritesGenie4,
+            _ => null
+        };
+
+        return (frames != null && frames.Count > 0) ? frames : null;
     }
 
     /// <summary>
@@ -1489,7 +1533,10 @@ public class SlotView : MonoBehaviour
             // Animate on top of that only if this symbol actually has frames.
             if (symbolId < 0 || symbolId >= animationSpriteArrays.Length) continue;
 
-            List<Sprite> animSprites = animationSpriteArrays[symbolId];
+            // The Genie's clip depends on its multiplier, not just its id — see GetGenieAnimFrames.
+            List<Sprite> animSprites = symbolId == WildSymbolId
+                ? GetGenieAnimFrames(flatIndex)
+                : animationSpriteArrays[symbolId];
 
             if (animSprites == null || animSprites.Count == 0) continue;
 
