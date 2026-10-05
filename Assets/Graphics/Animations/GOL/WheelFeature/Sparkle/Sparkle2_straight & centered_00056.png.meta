@@ -1,0 +1,728 @@
+fileFormatVersion: 2
+guid: 714d4c57c412e497e9aa2df3588488ad
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -1766867378212712220
+    second: Sparkle2_straight & centered_00056_0
+  - first:
+      213: -7914176011656031728
+    second: Sparkle2_straight & centered_00056_1
+  - first:
+      213: 537936853231978783
+    second: Sparkle2_straight & centered_00056_2
+  - first:
+      213: -2381983720201513163
+    second: Sparkle2_straight & centered_00056_3
+  - first:
+      213: -6703815502110170808
+    second: Sparkle2_straight & centered_00056_4
+  - first:
+      213: 5731491469444477688
+    second: Sparkle2_straight & centered_00056_5
+  - first:
+      213: 6617907266609456344
+    second: Sparkle2_straight & centered_00056_6
+  - first:
+      213: -9089891502883780027
+    second: Sparkle2_straight & centered_00056_7
+  - first:
+      213: 2704802437056271615
+    second: Sparkle2_straight & centered_00056_8
+  - first:
+      213: 4862492927921352792
+    second: Sparkle2_straight & centered_00056_9
+  - first:
+      213: -173835509609804763
+    second: Sparkle2_straight & centered_00056_10
+  - first:
+      213: 2579928408664701330
+    second: Sparkle2_straight & centered_00056_11
+  - first:
+      213: 2004913747514516977
+    second: Sparkle2_straight & centered_00056_12
+  - first:
+      213: 3482719071274008500
+    second: Sparkle2_straight & centered_00056_13
+  - first:
+      213: -5581563927439062379
+    second: Sparkle2_straight & centered_00056_14
+  - first:
+      213: -372207626212250274
+    second: Sparkle2_straight & centered_00056_15
+  - first:
+      213: -4136215069669230933
+    second: Sparkle2_straight & centered_00056_16
+  - first:
+      213: 6487557757031042794
+    second: Sparkle2_straight & centered_00056_17
+  - first:
+      213: 899241153062283885
+    second: Sparkle2_straight & centered_00056_18
+  - first:
+      213: 9039008530166787770
+    second: Sparkle2_straight & centered_00056_19
+  - first:
+      213: -8709358970100585813
+    second: Sparkle2_straight & centered_00056_20
+  - first:
+      213: -6178995782289659309
+    second: Sparkle2_straight & centered_00056_21
+  - first:
+      213: 5113173378094382495
+    second: Sparkle2_straight & centered_00056_22
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 1
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Sparkle2_straight & centered_00056_0
+      rect:
+        serializedVersion: 2
+        x: 586
+        y: 751
+        width: 23
+        height: 28
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4e0d7641b73da77e0800000000000000
+      internalID: -1766867378212712220
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Sparkle2_straight & centered_00056_1
+      rect:
+        serializedVersion: 2
+        x: 599
+        y: 729
+        width: 44
+        height: 36
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 012135739d23b2290800000000000000
+      internalID: -7914176011656031728
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Sparkle2_straight & centered_00056_2
+      rect:
+        serializedVersion: 2
+        x: 606
+        y: 756
+        width: 8
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f19cb78c7b2277700800000000000000
+      internalID: 537936853231978783
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Sparkle2_straight & centered_00056_3
+      rect:
+        serializedVersion: 2
+        x: 563
+        y: 677
+        width: 9
+        height: 9
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 53710a04d6e71fed0800000000000000
+      internalID: -2381983720201513163
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Sparkle2_straight & centered_00056_4
+      rect:
+        serializedVersion: 2
+        x: 567
+        y: 656
+        width: 8
+        height: 9
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 84167f4b15347f2a0800000000000000
+      internalID: -6703815502110170808
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Sparkle2_straight & centered_00056_5
+      rect:
+        serializedVersion: 2
+        x: 571
+        y: 668
+        width: 45
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8f27b6def195a8f40800000000000000
+      internalID: 5731491469444477688
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Sparkle2_straight & centered_00056_6
+      rect:
+        serializedVersion: 2
+        x: 573
+        y: 719
+        width: 18
+        height: 15
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8d4abb6889787db50800000000000000
+      internalID: 6617907266609456344
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Sparkle2_straight & centered_00056_7
+      rect:
+        serializedVersion: 2
+        x: 575
+        y: 624
+        width: 56
+        height: 49
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 54a45c3a6d73ad180800000000000000
+      internalID: -9089891502883780027
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Sparkle2_straight & centered_00056_8
+      rect:
+        serializedVersion: 2
+        x: 577
+        y: 661
+        width: 64
+        height: 89
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ff499506c73698520800000000000000
+      internalID: 2704802437056271615
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Sparkle2_straight & centered_00056_9
+      rect:
+        serializedVersion: 2
+        x: 593
+        y: 716
+        width: 6
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 850f99b2e8b0b7340800000000000000
+      internalID: 4862492927921352792
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Sparkle2_straight & centered_00056_10
+      rect:
+        serializedVersion: 2
+        x: 603
+        y: 718
+        width: 6
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 52ccb586689669df0800000000000000
+      internalID: -173835509609804763
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Sparkle2_straight & centered_00056_11
+      rect:
+        serializedVersion: 2
+        x: 603
+        y: 645
+        width: 29
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 299f568f73fbdc320800000000000000
+      internalID: 2579928408664701330
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Sparkle2_straight & centered_00056_12
+      rect:
+        serializedVersion: 2
+        x: 525
+        y: 403
+        width: 89
+        height: 252
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1f566ed4e62e2db10800000000000000
+      internalID: 2004913747514516977
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Sparkle2_straight & centered_00056_13
+      rect:
+        serializedVersion: 2
+        x: 612
+        y: 652
+        width: 8
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4bff3c70b8a155030800000000000000
+      internalID: 3482719071274008500
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Sparkle2_straight & centered_00056_14
+      rect:
+        serializedVersion: 2
+        x: 602
+        y: 624
+        width: 9
+        height: 14
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 59a4cdd2e2d4a82b0800000000000000
+      internalID: -5581563927439062379
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Sparkle2_straight & centered_00056_15
+      rect:
+        serializedVersion: 2
+        x: 602
+        y: 611
+        width: 7
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e5d6de0d227a5daf0800000000000000
+      internalID: -372207626212250274
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Sparkle2_straight & centered_00056_16
+      rect:
+        serializedVersion: 2
+        x: 604
+        y: 616
+        width: 12
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ba67fb90f463996c0800000000000000
+      internalID: -4136215069669230933
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Sparkle2_straight & centered_00056_17
+      rect:
+        serializedVersion: 2
+        x: 618
+        y: 613
+        width: 7
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: aee4aaf486f680a50800000000000000
+      internalID: 6487557757031042794
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Sparkle2_straight & centered_00056_18
+      rect:
+        serializedVersion: 2
+        x: 614
+        y: 608
+        width: 6
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d6aa0b7701fba7c00800000000000000
+      internalID: 899241153062283885
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Sparkle2_straight & centered_00056_19
+      rect:
+        serializedVersion: 2
+        x: 603
+        y: 589
+        width: 12
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: abe21521e52017d70800000000000000
+      internalID: 9039008530166787770
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Sparkle2_straight & centered_00056_20
+      rect:
+        serializedVersion: 2
+        x: 608
+        y: 595
+        width: 11
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: baaeacd2924222780800000000000000
+      internalID: -8709358970100585813
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Sparkle2_straight & centered_00056_21
+      rect:
+        serializedVersion: 2
+        x: 603
+        y: 571
+        width: 11
+        height: 15
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 35aecffd21ccf3aa0800000000000000
+      internalID: -6178995782289659309
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Sparkle2_straight & centered_00056_22
+      rect:
+        serializedVersion: 2
+        x: 614
+        y: 586
+        width: 6
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f9dbc4cb814a5f640800000000000000
+      internalID: 5113173378094382495
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 5e97eb03825dee720800000000000000
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      Sparkle2_straight & centered_00056_0: -1766867378212712220
+      Sparkle2_straight & centered_00056_1: -7914176011656031728
+      Sparkle2_straight & centered_00056_10: -173835509609804763
+      Sparkle2_straight & centered_00056_11: 2579928408664701330
+      Sparkle2_straight & centered_00056_12: 2004913747514516977
+      Sparkle2_straight & centered_00056_13: 3482719071274008500
+      Sparkle2_straight & centered_00056_14: -5581563927439062379
+      Sparkle2_straight & centered_00056_15: -372207626212250274
+      Sparkle2_straight & centered_00056_16: -4136215069669230933
+      Sparkle2_straight & centered_00056_17: 6487557757031042794
+      Sparkle2_straight & centered_00056_18: 899241153062283885
+      Sparkle2_straight & centered_00056_19: 9039008530166787770
+      Sparkle2_straight & centered_00056_2: 537936853231978783
+      Sparkle2_straight & centered_00056_20: -8709358970100585813
+      Sparkle2_straight & centered_00056_21: -6178995782289659309
+      Sparkle2_straight & centered_00056_22: 5113173378094382495
+      Sparkle2_straight & centered_00056_3: -2381983720201513163
+      Sparkle2_straight & centered_00056_4: -6703815502110170808
+      Sparkle2_straight & centered_00056_5: 5731491469444477688
+      Sparkle2_straight & centered_00056_6: 6617907266609456344
+      Sparkle2_straight & centered_00056_7: -9089891502883780027
+      Sparkle2_straight & centered_00056_8: 2704802437056271615
+      Sparkle2_straight & centered_00056_9: 4862492927921352792
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

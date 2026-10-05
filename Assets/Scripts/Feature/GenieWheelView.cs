@@ -54,14 +54,15 @@ public class GenieWheelView : MonoBehaviour
 
     [Tooltip("WheelMask: the dark overlay over the wheel, inside Wheel after Slices so it turns with it. " +
              "Image Type Filled, Radial 360, origin Top, Fill Clockwise OFF — lowering the fill then lights the " +
-             "wedges clockwise. Fill 1 = every wedge dim, 0 = none.")]
+             "wedges clockwise. Fill 1 = every wedge dim, 0 = none. The code switches it on under Genie " +
+             "animation 1's held frame and off when the sweep finishes — save it off in the scene.")]
     [SerializeField] private Image wheelMask;
 
     [Header("Wheel Animations")]
     [Tooltip("Loop around the green centre circle while the feature waits for Start. Must be its own object — it is hidden whenever it isn't playing.")]
     [SerializeField] private ImageAnimation centreLoop;
 
-    [Tooltip("Loop on the outside of the wheel, from the undim sweep until the wheel resets. Its own object, hidden when not playing.")]
+    [Tooltip("Loop on the outside of the wheel. Starts with the undim sweep (Start pressed) and runs until the background returns to base — after a cash landing, or at the end of the free-games round. Its own object, hidden when not playing.")]
     [SerializeField] private ImageAnimation outerLoop;
 
     [Tooltip("Smoke travelling clockwise over the wheel during the undim sweep. Played once; its speed is SET BY CODE so it lasts exactly Undim Sweep Duration.")]
@@ -195,12 +196,13 @@ public class GenieWheelView : MonoBehaviour
         SetGroup(fullScreenDim, 0f, false);
         if (winnerPanel != null) winnerPanel.SetActive(false);
 
-        // Undimmed whatever fill the scene was saved with — the base game shows a lit wheel.
+        // Off and undimmed whatever the scene was saved with — the base game shows a lit wheel.
         if (wheelMask != null && wheelMask.type != Image.Type.Filled)
         {
             Debug.LogWarning("[GenieWheelView] Wheel Mask is not a Filled image — the undim sweep can't step it. Set Image Type to Filled, Radial 360.");
         }
         SetMaskFill(0f);
+        SetMaskVisible(false);
     }
 
     private void OnDestroy()
@@ -388,9 +390,15 @@ public class GenieWheelView : MonoBehaviour
         ResumeIdle();
     }
 
-    /// <summary>Swaps the background sprite. The free-games round restores it at its own end.</summary>
+    /// <summary>
+    /// Swaps the background sprite. The free-games round restores it at its own end. The outer loop
+    /// belongs to the feature background, not the wheel, so it goes when the background returns to
+    /// base — which for a free-games landing is the end of the round, not the wheel's reset.
+    /// </summary>
     internal void SetFeatureBackground(bool on)
     {
+        if (!on) StopLoop(outerLoop);
+
         if (backgroundImage == null) return;
 
         if (on && featureBackground != null) backgroundImage.sprite = featureBackground;
@@ -399,7 +407,8 @@ public class GenieWheelView : MonoBehaviour
 
     /// <summary>
     /// Hands the wheel back to the drift: every wheel animation stopped and hidden, the mask cleared
-    /// so every wedge is lit, and the rotator restarted from wherever the wheel now stands.
+    /// so every wedge is lit, and the rotator restarted from wherever the wheel now stands. The outer
+    /// loop is left alone — it stops with the background (SetFeatureBackground).
     /// </summary>
     internal void ResumeIdle()
     {
@@ -409,11 +418,11 @@ public class GenieWheelView : MonoBehaviour
         isSpinning = false;
 
         StopLoop(centreLoop);
-        StopLoop(outerLoop);
         StopLoop(smokeSweep);
         StopLoop(spinLoop);
         StopLoop(winHighlight);
         SetMaskFill(0f);
+        SetMaskVisible(false);
 
         if (rotator != null) rotator.StartRotating();
     }
@@ -536,8 +545,10 @@ public class GenieWheelView : MonoBehaviour
         yield return sweepTween.WaitForCompletion();
         sweepTween = null;
 
-        // Whatever the tween's last step didn't reach.
+        // Whatever the tween's last step didn't reach. Every wedge is lit, so the mask goes — the wheel
+        // spins with nothing over it.
         SetMaskFill(0f);
+        SetMaskVisible(false);
 
         StopLoop(smokeSweep);
 
@@ -666,7 +677,11 @@ public class GenieWheelView : MonoBehaviour
 
         SetWheelAngle(sliceZeroAngle);
         StopLoop(winHighlight);
+
+        // The dim goes up here, with the background swap — every wedge dark while the wheel waits
+        // for Start. The fill only starts dropping once Start begins the sweep.
         SetMaskFill(1f);
+        SetMaskVisible(true);
     }
 
     private float AngleForSlice(int sliceIndex)
@@ -698,6 +713,13 @@ public class GenieWheelView : MonoBehaviour
     private void SetMaskFill(float fill)
     {
         if (wheelMask != null) wheelMask.fillAmount = Mathf.Clamp01(fill);
+    }
+
+    // The mask is switched on and off explicitly rather than left active with a fill of 0: only the
+    // feature should ever draw it, whatever state the scene was saved in.
+    private void SetMaskVisible(bool visible)
+    {
+        if (wheelMask != null) wheelMask.gameObject.SetActive(visible);
     }
 
     private void ResolveSlices()
