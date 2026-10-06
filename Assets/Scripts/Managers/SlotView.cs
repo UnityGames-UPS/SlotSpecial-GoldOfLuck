@@ -70,18 +70,19 @@ public class SlotView : MonoBehaviour
     //
     // Kept next to the sprite fields on purpose: both are id-keyed maps of the same symbol table, so
     // if the backend ever reorders it they have to be corrected together.
+    private static Vector2 DefaultSymbolSize = new Vector2(200f, 200f);
     private static readonly Dictionary<int, Vector2> SymbolSizeOverrides = new Dictionary<int, Vector2>
     {
-        {0, new Vector2(175f, 175f)},  // Prince
-        {1, new Vector2(175f, 175f)},  // Princess
-        {2, new Vector2(175f, 175f)},  // Camel
-        {3, new Vector2(175f, 175f)},  // Parrot
-        {4, new Vector2(175f, 175f)},  // Turban
-        {5, new Vector2(175f, 175f)},  // Carpet
-        {6, new Vector2(175f, 175f)},  // Sword
-        {7, new Vector2(175f, 175f)},  // Potion
+        {0, DefaultSymbolSize},  // Prince
+        {1, DefaultSymbolSize},  // Princess
+        {2, DefaultSymbolSize},  // Camel
+        {3, DefaultSymbolSize},  // Parrot
+        {4, DefaultSymbolSize},  // Turban
+        {5, DefaultSymbolSize},  // Carpet
+        {6, DefaultSymbolSize},  // Sword
+        {7, DefaultSymbolSize},  // Potion
         {8, new Vector2(262.5f, 262.5f)},  // Genie (oversized)
-        {9, new Vector2(175f, 175f)}   // Lamp
+        {9, new Vector2(300f, 600f)}   // Lamp
     };
 
     // Playback speed per symbol, applied wherever that symbol's clip is assigned.
@@ -110,7 +111,7 @@ public class SlotView : MonoBehaviour
         { 6, DefaultSymbolAnimationSpeed },  // Sword
         { 7, DefaultSymbolAnimationSpeed },  // Potion
         { 8, DefaultSymbolAnimationSpeed },  // Genie
-        { 9, DefaultSymbolAnimationSpeed }   // Lamp
+        { 9, 107f }   // Lamp
     };
 
     // Internal array built from named sprites

@@ -73,6 +73,10 @@ public class AudioManager : MonoBehaviour
     [Tooltip("The win amount counting up in the universal win popup.")]
     [SerializeField] private AudioClip clipWinCountUp;
 
+    [Header("Audio Clips - Gold of Luck")]
+    [Tooltip("The Genie Wheel's Winner panel opening — after a cash landing, and at the end of the free-games round.")]
+    [SerializeField] private AudioClip clipWinner;
+
     private bool _musicEnabled = true;
     private bool _sfxEnabled   = true;
     private float _musicVolume = 0.5f;
@@ -319,6 +323,9 @@ public class AudioManager : MonoBehaviour
     internal void PlayWildAnimate()        => PlayUISound(clipWildAnimate);
     internal void PlayWinCountUp()         => PlayUISound(clipWinCountUp);
     internal void PlayCongratulations() => PlayUISound(clipCongratulations);
+
+    // 18. Gold of Luck cues.
+    internal void PlayWinner() => PlayUISound(clipWinner);
 
     /// <summary>
     /// The Free Games completion cue. Returns how long it runs, so the caller can hold the

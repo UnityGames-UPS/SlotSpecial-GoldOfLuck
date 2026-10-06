@@ -29,7 +29,12 @@ public class GenieWheelView : MonoBehaviour
     // Child names looked up under each Slice_ (n). They match the scene as built; resolving them
     // by name saves wiring two references on each of eighteen slices.
     private const string AmountTextName = "AmountText";
+    private const string FreeSpinAmountTextName = "FreeSpinAmountText";   // the free-games wedges' count
     private const string MultiplierTextName = "MultiplierText";
+
+    // The "X" on a multiplier badge. WheelBrownNumbers (the badges' sprite asset) holds it at index 11,
+    // after the digits 0-9 and the decimal point at 10. Only that asset has it.
+    private const string MultiplierSign = "<sprite=11>";
 
     // Must match ImageAnimation's own idealFrameRate. A clip of n frames at speed s lasts
     // n² × this ÷ s — quadratic, see GameExplanation.md §10.
@@ -49,7 +54,8 @@ public class GenieWheelView : MonoBehaviour
     [SerializeField] private RectTransform wheel;
 
     [Tooltip("The Slices container. Its children are read in sibling order as slices 0..17, and each child's " +
-             "\"AmountText\" and \"MultiplierText\" are found by name. Either may be missing.")]
+             "\"AmountText\" (or \"FreeSpinAmountText\" on a free-games wedge) and \"MultiplierText\" are found " +
+             "by name. Any may be missing.")]
     [SerializeField] private Transform slicesRoot;
 
     [Tooltip("WheelMask: the dark overlay over the wheel, inside Wheel after Slices so it turns with it. " +
@@ -270,20 +276,27 @@ public class GenieWheelView : MonoBehaviour
             WheelSlice slice = slices[i];
             SliceRefs refs = sliceRefs[i];
 
+            // Every label is drawn in one of the wheel's sprite-digit fonts — WheelWhiteNumbers for
+            // cash, WheelYellowNumbers for the free-games count, WheelBrownNumbers for the multiplier
+            // badge — so each goes through ToSpriteDigits, which passes the stacking line breaks
+            // through untouched.
             switch (slice.type)
             {
                 case WheelSliceType.Coin:
-                    SetText(refs.amountText, Stacked((slice.coin * totalBet).ToString(SpriteTextFormatter.MoneyFormat)));
+                    SetText(refs.amountText, SpriteTextFormatter.ToSpriteDigits(
+                        Stacked((slice.coin * totalBet).ToString(SpriteTextFormatter.MoneyFormat))));
                     break;
 
                 case WheelSliceType.Multiplier:
-                    SetText(refs.amountText, Stacked((slice.multiplier * totalBet).ToString(SpriteTextFormatter.MoneyFormat)));
-                    SetText(refs.multiplierText, "X" + slice.multiplier);
+                    SetText(refs.amountText, SpriteTextFormatter.ToSpriteDigits(
+                        Stacked((slice.multiplier * totalBet).ToString(SpriteTextFormatter.MoneyFormat))));
+                    SetText(refs.multiplierText, MultiplierSign + SpriteTextFormatter.ToSpriteDigits(slice.multiplier.ToString()));
                     break;
 
                 case WheelSliceType.FreeGames:
-                    // A count, not money. The scene's "FREE" label beside it stays as built.
-                    SetText(refs.amountText, slice.freeGames.ToString());
+                    // A count, not money — ToSpriteDigits rather than ToSpriteMoney, so 8 stays "8"
+                    // and not "8.00". The scene's "FREE" label beside it stays as built.
+                    SetText(refs.amountText, SpriteTextFormatter.ToSpriteDigits(slice.freeGames.ToString()));
                     break;
             }
         }
@@ -450,6 +463,7 @@ public class GenieWheelView : MonoBehaviour
         winnerPanel.SetActive(true);
         SetGroup(winnerPanelGroup, 1f, true);
         StartLoop(winnerPanelAnim);
+        AudioManager.Instance?.PlayWinner();
 
         if (winnerAmountText == null)
         {
@@ -458,7 +472,6 @@ public class GenieWheelView : MonoBehaviour
         }
 
         winnerAmountText.text = SpriteTextFormatter.ToSpriteMoney(0);
-        AudioManager.Instance?.PlayWinCountUp();
 
         winnerCountTween = DOVirtual.Float(0f, (float)amount, Mathf.Max(0.01f, winnerCountUpDuration), value =>
         {
@@ -735,7 +748,9 @@ public class GenieWheelView : MonoBehaviour
         for (int i = 0; i < slicesRoot.childCount; i++)
         {
             Transform child = slicesRoot.GetChild(i);
+            // The free-games wedges name their count differently; either name fills the same slot.
             Transform amount = child.Find(AmountTextName);
+            if (amount == null) amount = child.Find(FreeSpinAmountTextName);
             Transform multiplier = child.Find(MultiplierTextName);
 
             sliceRefs.Add(new SliceRefs
