@@ -255,6 +255,20 @@ public class GenieWheelView : MonoBehaviour
             {
                 Debug.LogError($"[GenieWheelView] Slice {i} is a MULTIPLIER slice but has no \"{MultiplierTextName}\" child.");
             }
+
+            // A MULTIPLIER slice pays coin × multiplier × total bet, so it needs its coin. The backend
+            // once sent coin 0 on all six; a regression would otherwise just show 0.00 on the wedge.
+            if (slices[i].type == WheelSliceType.Multiplier && slices[i].coin <= 0)
+            {
+                Debug.LogError($"[GenieWheelView] Slice {i} is a MULTIPLIER slice with no coin value — its wedge cannot show what it pays. Backend data?");
+            }
+
+            // Every wedge writes its value into an amount text, found by name. A renamed child would
+            // otherwise leave the scene's placeholder showing with no sign anything was wrong.
+            if (i < sliceRefs.Count && sliceRefs[i].amountText == null)
+            {
+                Debug.LogError($"[GenieWheelView] Slice {i} has no \"{AmountTextName}\" or \"{FreeSpinAmountTextName}\" child — its value is not written.");
+            }
         }
 
         WriteLabels(totalBet);
@@ -425,6 +439,8 @@ public class GenieWheelView : MonoBehaviour
     /// </summary>
     internal void ResumeIdle()
     {
+        bool wasSpinning = isSpinning;
+
         StopSequence(ref wheelSequence);
         if (spinTween != null) { spinTween.Kill(); spinTween = null; }
         if (sweepTween != null) { sweepTween.Kill(); sweepTween = null; }
@@ -436,6 +452,10 @@ public class GenieWheelView : MonoBehaviour
         StopLoop(winHighlight);
         SetMaskFill(0f);
         SetMaskVisible(false);
+
+        // A spin cut short here must not leave its sound running. Only when a spin WAS running: the
+        // sound shares the reel spin's source, and an unconditional stop could cut the reels' sound.
+        if (wasSpinning) AudioManager.Instance?.StopWheelSpin();
 
         if (rotator != null) rotator.StartRotating();
     }
@@ -528,6 +548,7 @@ public class GenieWheelView : MonoBehaviour
     {
         StopLoop(centreLoop);
         StartLoop(outerLoop);
+        AudioManager.Instance?.PlayWheelSweep();
 
         float duration = Mathf.Max(0.01f, undimSweepDuration);
 
@@ -575,6 +596,7 @@ public class GenieWheelView : MonoBehaviour
         Freeze();
         StopLoop(winHighlight);
         StartLoop(spinLoop);
+        AudioManager.Instance?.PlayWheelSpin();
 
         float start = wheel.localEulerAngles.z;
         float target = AngleForSlice(sliceIndex);
@@ -602,9 +624,11 @@ public class GenieWheelView : MonoBehaviour
 
         SetWheelAngle(end);
         StopLoop(spinLoop);
+        AudioManager.Instance?.StopWheelSpin();
         isSpinning = false;
 
         StartLoop(winHighlight);
+        AudioManager.Instance?.PlayWheelWin();
         if (winHighlightHold > 0f) yield return new WaitForSeconds(winHighlightHold);
 
         wheelSequence = null;

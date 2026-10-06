@@ -101,8 +101,9 @@ public class ServerWheelSlice
 {
     public int sliceIndex;
     public string type;       // "COIN", "MULTIPLIER" or "FREE_GAMES"
-    // Exactly one of these three is non-zero, matching the type. double for coin in case a fractional
-    // value is ever sent; every captured coin so far has been a whole number.
+    // Which are set depends on the type: a COIN slice has a coin, a FREE_GAMES slice has freeGames, and a
+    // MULTIPLIER slice has BOTH a coin and a multiplier (it pays coin × multiplier × total bet). double for
+    // coin in case a fractional value is ever sent; every captured coin so far has been a whole number.
     public double coin;
     public int multiplier;
     public int freeGames;
@@ -620,7 +621,7 @@ public static class InitDataConverter
             slices.Add(new WheelSlice
             {
                 sliceIndex = serverSlice.sliceIndex,
-                type = ParseSliceType(serverSlice.type, serverSlice.coin, serverSlice.freeGames, "wheel slice " + serverSlice.sliceIndex),
+                type = ParseSliceType(serverSlice.type, serverSlice.coin, serverSlice.multiplier, serverSlice.freeGames, "wheel slice " + serverSlice.sliceIndex),
                 coin = serverSlice.coin,
                 multiplier = serverSlice.multiplier,
                 freeGames = serverSlice.freeGames
@@ -631,10 +632,13 @@ public static class InitDataConverter
         return slices;
     }
 
-    // An unknown type is read from whichever figure is non-zero, and logged — the backend has added a
-    // slice kind this client doesn't know. The amount paid is unaffected either way, since the client
-    // always shows the server's winInCash; only how the wheel describes the slice would be wrong.
-    private static WheelSliceType ParseSliceType(string type, double coin, int freeGames, string source)
+    // An unknown type is read from its figures, and logged — the backend has added a slice kind this
+    // client doesn't know. The amount paid is unaffected either way, since the client always shows the
+    // server's winInCash; only how the wheel describes the slice would be wrong.
+    //
+    // The multiplier is checked BEFORE the coin: a MULTIPLIER slice carries a coin value too, so a coin
+    // check first would misread it as a COIN slice and lose its badge.
+    private static WheelSliceType ParseSliceType(string type, double coin, int multiplier, int freeGames, string source)
     {
         switch ((type ?? string.Empty).Trim().ToUpperInvariant())
         {
@@ -643,8 +647,9 @@ public static class InitDataConverter
             case "FREE_GAMES": return WheelSliceType.FreeGames;
         }
 
-        WheelSliceType guess = freeGames > 0 ? WheelSliceType.FreeGames
-                             : coin > 0      ? WheelSliceType.Coin
+        WheelSliceType guess = freeGames > 0  ? WheelSliceType.FreeGames
+                             : multiplier > 0 ? WheelSliceType.Multiplier
+                             : coin > 0       ? WheelSliceType.Coin
                              : WheelSliceType.Multiplier;
         UnityEngine.Debug.LogError($"[InitDataConverter] {source} has unrecognised type '{type}' — read as {guess} from its figures.");
         return guess;
@@ -734,7 +739,7 @@ public static class InitDataConverter
         var result = serverWheel.result;
         data.triggered = true;
         data.sliceIndex = result.sliceIndex;
-        data.type = ParseSliceType(result.type, result.coinAwarded, result.freeGamesAwarded, "genieWheel result");
+        data.type = ParseSliceType(result.type, result.coinAwarded, result.multiplierAwarded, result.freeGamesAwarded, "genieWheel result");
         data.coin = result.coinAwarded;
         data.multiplier = result.multiplierAwarded;
         data.freeGames = result.freeGamesAwarded;

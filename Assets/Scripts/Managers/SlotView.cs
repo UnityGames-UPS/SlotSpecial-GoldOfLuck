@@ -330,6 +330,7 @@ public class SlotView : MonoBehaviour
     private void HideAnticipationEffects()
     {
         anticipatedReels.Clear();
+        AudioManager.Instance?.StopAnticipation();
         if (anticipationEffects == null) return;
         foreach (var effect in anticipationEffects)
         {
@@ -893,6 +894,9 @@ public class SlotView : MonoBehaviour
         // reel keeps the loop running while it spins on.
         AudioManager.Instance?.StopSpinLoop();
 
+        // Safety net only — the tension normally stops as the last held reel lands, below.
+        AudioManager.Instance?.StopAnticipation();
+
         onComplete?.Invoke();
     }
 
@@ -1022,6 +1026,9 @@ public class SlotView : MonoBehaviour
         if (anticipatedReels.Contains(columnIndex + 1))
         {
             SetAnticipationEffect(columnIndex + 1, true);
+
+            // Starts with the first held reel and runs across any that follow it.
+            AudioManager.Instance?.PlayAnticipation();
         }
 
         if (isQuickStop)
@@ -1053,6 +1060,9 @@ public class SlotView : MonoBehaviour
                     if (anticipatedReels.Remove(columnIndex))
                     {
                         SetAnticipationEffect(columnIndex, false);
+
+                        // The last held reel has landed: the tension is over.
+                        if (anticipatedReels.Count == 0) AudioManager.Instance?.StopAnticipation();
                     }
                 });
 

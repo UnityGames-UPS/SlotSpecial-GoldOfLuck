@@ -111,6 +111,7 @@ public class FreeGameView : MonoBehaviour
         // Snaps shut — a placeholder until the panel's own closing animation exists (ToDo.md).
         // Stopped explicitly: ImageAnimation drives itself with Invoke, so deactivating the object
         // is not a reliable way to end a looping clip.
+        AudioManager.Instance?.PlayCongratsClose();
         if (congratulationsPanelAnim != null) congratulationsPanelAnim.StopAnimation();
         congratulationsPanel.SetActive(false);
 

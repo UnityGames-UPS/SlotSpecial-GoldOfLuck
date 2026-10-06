@@ -957,7 +957,7 @@ public class GameManager : MonoBehaviour
         freeSpinsRoundWin = 0;
         retriggerPending = false;
 
-        AudioManager.Instance?.PlayFreeSpinBg();
+        // No music change: Gold of Luck plays its one background track through the free spins too.
 
         if (freeGameView != null) freeGameView.ShowCounter(freeSpinsRemaining, FreeSpinsTotalAwarded);
 
@@ -1011,7 +1011,6 @@ public class GameManager : MonoBehaviour
         {
             if (genieWheelView != null) genieWheelView.SetFeatureBackground(false);
             if (freeGameView != null) freeGameView.HideCounter();
-            AudioManager.Instance?.PlayMainBg();
         };
 
         if (genieWheelView != null)
