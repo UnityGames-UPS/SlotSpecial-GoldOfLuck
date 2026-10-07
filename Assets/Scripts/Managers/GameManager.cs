@@ -119,7 +119,38 @@ public class GameManager : MonoBehaviour
         currentState = GameState.Idle;
 
         uiManager.OnGameInitialized();
+
+        // Congratulations panel test trigger — commented out. Uncomment this and the block below to use it.
+//#if UNITY_EDITOR || DEVELOPMENT_BUILD
+//        if (DebugShowCongratulationsOnStart) StartCoroutine(DebugShowCongratulationsAfterStart());
+//#endif
     }
+
+    // ── TEMPORARY: congratulations panel test trigger — COMMENTED OUT ─────────────────────────
+    // Opens the free-games congratulations panel once, shortly after init, so it can be checked
+    // without landing free games on the wheel. Set DebugShowCongratulationsOnStart to false, or remove
+    // this block, once the panel is signed off (tracked in ToDo.md).
+    //
+    // Editor and development builds only, so a release build can never show it. It goes through the
+    // real ShowCongratulations — panel animation, title pop and pulse, hold, the close and its sound —
+    // but starts nothing afterwards: no free spins, no fade. Don't spin while it's up.
+//#if UNITY_EDITOR || DEVELOPMENT_BUILD
+//    private static readonly bool DebugShowCongratulationsOnStart = true;
+//    private const float DebugCongratulationsDelay = 1f;
+//    private const int DebugCongratulationsSpins = 10;
+
+//    private IEnumerator DebugShowCongratulationsAfterStart()
+//    {
+//        yield return new WaitForSeconds(DebugCongratulationsDelay);
+
+//        // Only on an idle board — never over a spin that started in the meantime.
+//        if (freeGameView == null || currentState != GameState.Idle) yield break;
+
+//        Debug.Log($"[GameManager] DEBUG: showing the congratulations panel for testing ({DebugCongratulationsSpins} spins).");
+//        freeGameView.ShowCongratulations(DebugCongratulationsSpins,
+//            () => Debug.Log("[GameManager] DEBUG: congratulations panel closed."));
+//    }
+//#endif
 
     #endregion
 

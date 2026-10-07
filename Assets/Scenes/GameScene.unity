@@ -3002,7 +3002,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &123799575
 RectTransform:
   m_ObjectHideFlags: 0
@@ -3017,10 +3017,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 552689586}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 120}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 1}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 1257, y: 1257}
+  m_SizeDelta: {x: 1133, y: 1148}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &123799576
 MonoBehaviour:
@@ -3044,7 +3044,7 @@ MonoBehaviour:
       m_Calls: []
   m_Sprite: {fileID: 21300000, guid: c6e232e176cdc49e8be3c3711c146efa, type: 3}
   m_Type: 3
-  m_PreserveAspect: 0
+  m_PreserveAspect: 1
   m_FillCenter: 1
   m_FillMethod: 4
   m_FillAmount: 0.055555556
@@ -4140,7 +4140,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: <sprite=11><sprite=2>
+  m_text: <sprite=11><sprite=1><sprite=5>
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -4709,11 +4709,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ImageAnimation
   textureArray:
-  - {fileID: 21300000, guid: 895e303cb9188412693e74734c7f5436, type: 3}
-  - {fileID: 21300000, guid: cca0e874bcd1a454b806597940cd5e9d, type: 3}
-  - {fileID: 21300000, guid: 3c376bc8827a242908c5a79fef9e6c01, type: 3}
-  - {fileID: 21300000, guid: 518e1ced63c8448d588a773202bc8c97, type: 3}
-  - {fileID: 21300000, guid: 294ca553219764af1b3a6b9c2dbc0396, type: 3}
   - {fileID: 21300000, guid: bc891dc89fdb74cdfb3d02da705fa00d, type: 3}
   - {fileID: 21300000, guid: 1f9d01dad9a0b4a87abc65bee055e4da, type: 3}
   - {fileID: 21300000, guid: 5b5b9d24021794572aea1c8d2ff76a98, type: 3}
@@ -4753,7 +4748,7 @@ MonoBehaviour:
   AnimationSpeed: 35
   delayBetweenLoop: 0
   animationMode: 1
-  phase2StartIndex: 22
+  phase2StartIndex: 16
   phase1LoopCount: 1
   phase2LoopCount: -1
   useCustomSpeed: 0
@@ -6088,7 +6083,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &260048363
 RectTransform:
   m_ObjectHideFlags: 0
@@ -8304,7 +8299,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &354758445
 RectTransform:
   m_ObjectHideFlags: 0
@@ -8319,10 +8314,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 552689586}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 1}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 1257, y: 1257}
+  m_SizeDelta: {x: 1133, y: 1148}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &354758446
 MonoBehaviour:
@@ -8346,7 +8341,7 @@ MonoBehaviour:
       m_Calls: []
   m_Sprite: {fileID: 21300000, guid: c6e232e176cdc49e8be3c3711c146efa, type: 3}
   m_Type: 3
-  m_PreserveAspect: 0
+  m_PreserveAspect: 1
   m_FillCenter: 1
   m_FillMethod: 4
   m_FillAmount: 0.055555556
@@ -14567,7 +14562,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &552689586
 RectTransform:
   m_ObjectHideFlags: 0
@@ -21857,12 +21852,17 @@ MonoBehaviour:
   congratulationsPanel: {fileID: 194838127}
   awardedSpinsText: {fileID: 1262668282}
   congratulationsPanelAnim: {fileID: 194838132}
-  congratulationsHold: 2.5
+  panelScaleUpDuration: 0.35
+  clipEarlyStartFrames: 5
+  titlesPulseHold: 2
   congratulationsTitle: {fileID: 512716802}
   freeGamesAwardedTitle: {fileID: 1743820733}
+  titleLeadFrames: 9
+  titleStagger: 0.1
   titlePopDuration: 0.35
   titlePulseScale: 1.06
   titlePulseDuration: 0.6
+  panelScaleDownDuration: 0.8
 --- !u!1 &894017002
 GameObject:
   m_ObjectHideFlags: 0
@@ -30770,7 +30770,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f521a04de7f494272a617b2719edd271, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SocketIOManager
-  testToken: 51d76220e32043249b237391c08aa3de
+  testToken: 49b7102c777d4356aebc17632f4d4c48
   gameManager: {fileID: 1206269883}
   uiManager: {fileID: 885496184}
   popupManager: {fileID: 1363796882}
@@ -40441,7 +40441,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1638044571
 RectTransform:
   m_ObjectHideFlags: 0
@@ -40456,10 +40456,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 552689586}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 240}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 1}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 1257, y: 1257}
+  m_SizeDelta: {x: 1133, y: 1148}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1638044572
 MonoBehaviour:
@@ -40483,7 +40483,7 @@ MonoBehaviour:
       m_Calls: []
   m_Sprite: {fileID: 21300000, guid: c6e232e176cdc49e8be3c3711c146efa, type: 3}
   m_Type: 3
-  m_PreserveAspect: 0
+  m_PreserveAspect: 1
   m_FillCenter: 1
   m_FillMethod: 4
   m_FillAmount: 0.055555556
@@ -49696,6 +49696,14 @@ MonoBehaviour:
   wheel: {fileID: 1565933572}
   slicesRoot: {fileID: 1529977467}
   wheelMask: {fileID: 1553282987}
+  freeGamesMaskGroup: {fileID: 552689587}
+  freeGamesMasks:
+  - mask: {fileID: 354758444}
+    revealStep: 18
+  - mask: {fileID: 123799574}
+    revealStep: 12
+  - mask: {fileID: 1638044570}
+    revealStep: 6
   centreLoop: {fileID: 1911114806}
   outerLoop: {fileID: 1820423507}
   smokeSweep: {fileID: 1802169226}
@@ -49711,7 +49719,7 @@ MonoBehaviour:
   winnerPanelGroup: {fileID: 34854770}
   winnerAmountText: {fileID: 849699146}
   winnerPanelAnim: {fileID: 2119100375}
-  spinDuration: 6
+  spinDuration: 4.5
   spinCurve:
     serializedVersion: 2
     m_Curve:
@@ -49758,7 +49766,8 @@ MonoBehaviour:
   sliceZeroAngle: 10
   slicesClockwise: 1
   spinClockwise: 1
-  undimSweepDuration: 2.5
+  undimSweepDuration: 2
+  freeGamesMaskFadeDuration: 0.5
   winHighlightHold: 2
   dimFadeDuration: 0.4
   dimHoldDuration: 0.3

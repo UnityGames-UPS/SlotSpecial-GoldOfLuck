@@ -121,7 +121,7 @@ MonoBehaviour:
       m_Height: 333
       m_HorizontalBearingX: -48
       m_HorizontalBearingY: 305
-      m_HorizontalAdvance: 150
+      m_HorizontalAdvance: 90
     m_GlyphRect:
       m_X: 0
       m_Y: 667

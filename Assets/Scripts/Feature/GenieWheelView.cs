@@ -64,6 +64,28 @@ public class GenieWheelView : MonoBehaviour
              "animation 1's held frame and off when the sweep finishes — save it off in the scene.")]
     [SerializeField] private Image wheelMask;
 
+    [Tooltip("FreeGamesMask: the parent of the free-games wedge masks, inside Wheel. Its CanvasGroup fades them out " +
+             "together once the sweep has finished, and the wheel spin waits for that fade. Save it off in the scene.")]
+    [SerializeField] private CanvasGroup freeGamesMaskGroup;
+
+    [Tooltip("One per free-games wedge: the mask over it, and the sweep step at which the WheelMask leaves that wedge " +
+             "(1 = the first wedge lit, 18 = the last). Each mask switches on at its step, so the free-games wedges stay " +
+             "dark until the fade. Counted in wedges, not time, so a change to Undim Sweep Duration keeps them in step.")]
+    [SerializeField] private FreeGamesWedgeMask[] freeGamesMasks =
+    {
+        new FreeGamesWedgeMask { revealStep = 18 },  // FreeGameMask (0)
+        new FreeGamesWedgeMask { revealStep = 12 },  // FreeGameMask (1)
+        new FreeGamesWedgeMask { revealStep = 6 },   // FreeGameMask (2)
+    };
+
+    [Serializable]
+    private class FreeGamesWedgeMask
+    {
+        public GameObject mask;
+        [Tooltip("The lit-wedge count at which the WheelMask leaves this wedge.")]
+        public int revealStep;
+    }
+
     [Header("Wheel Animations")]
     [Tooltip("Loop around the green centre circle while the feature waits for Start. Must be its own object — it is hidden whenever it isn't playing.")]
     [SerializeField] private ImageAnimation centreLoop;
@@ -137,6 +159,9 @@ public class GenieWheelView : MonoBehaviour
     [Tooltip("Length of the undim sweep. THE single pace-setter: the smoke clip's speed is computed from it.")]
     [SerializeField] private float undimSweepDuration = 2.5f;
 
+    [Tooltip("Fade of the free-games wedge masks once the sweep has finished. The wheel spin waits for it.")]
+    [SerializeField] private float freeGamesMaskFadeDuration = 0.5f;
+
     [Tooltip("How long the winning-wedge highlight plays before the feature moves on.")]
     [SerializeField] private float winHighlightHold = 2f;
 
@@ -209,6 +234,7 @@ public class GenieWheelView : MonoBehaviour
         }
         SetMaskFill(0f);
         SetMaskVisible(false);
+        HideFreeGamesMasks();
     }
 
     private void OnDestroy()
@@ -217,6 +243,7 @@ public class GenieWheelView : MonoBehaviour
         sweepTween?.Kill();
         winnerCountTween?.Kill();
         if (fullScreenDim != null) fullScreenDim.DOKill();
+        if (freeGamesMaskGroup != null) freeGamesMaskGroup.DOKill();
         if (winnerPanelGroup != null) winnerPanelGroup.DOKill();
     }
 
@@ -271,6 +298,7 @@ public class GenieWheelView : MonoBehaviour
             }
         }
 
+        CheckFreeGamesMasks();
         WriteLabels(totalBet);
     }
 
@@ -361,7 +389,9 @@ public class GenieWheelView : MonoBehaviour
 
     /// <summary>
     /// After Start: the outer loop starts and the smoke travels clockwise while the mask's fill drops
-    /// one wedge (1/18) at a time, lighting the wedges in turn from slice 0.
+    /// one wedge (1/18) at a time, lighting the wedges in turn from slice 0. The free-games wedges are
+    /// kept dark by their own masks as the sweep passes them; those fade out together once the sweep
+    /// has finished, and only then does onComplete run.
     /// </summary>
     internal void PlayUndimSweep(Action onComplete)
     {
@@ -452,6 +482,7 @@ public class GenieWheelView : MonoBehaviour
         StopLoop(winHighlight);
         SetMaskFill(0f);
         SetMaskVisible(false);
+        HideFreeGamesMasks();
 
         // A spin cut short here must not leave its sound running. Only when a spin WAS running: the
         // sound shares the reel spin's source, and an unconditional stop could cut the reels' sound.
@@ -574,6 +605,7 @@ public class GenieWheelView : MonoBehaviour
         {
             int lit = Mathf.Min(steps, Mathf.FloorToInt(progress * steps));
             SetMaskFill(1f - (float)lit / steps);
+            RevealFreeGamesMasks(lit);
         }).SetEase(Ease.Linear);
 
         yield return sweepTween.WaitForCompletion();
@@ -583,8 +615,18 @@ public class GenieWheelView : MonoBehaviour
         // spins with nothing over it.
         SetMaskFill(0f);
         SetMaskVisible(false);
+        RevealFreeGamesMasks(steps);
 
         StopLoop(smokeSweep);
+
+        // The free-games wedges light last: their masks fade out together, and the wheel spins only
+        // once they have gone.`
+        if (freeGamesMaskGroup != null && freeGamesMaskGroup.gameObject.activeSelf)
+        {
+            freeGamesMaskGroup.DOKill();
+            yield return freeGamesMaskGroup.DOFade(0f, freeGamesMaskFadeDuration).WaitForCompletion();
+        }
+        HideFreeGamesMasks();
 
         wheelSequence = null;
         onComplete?.Invoke();
@@ -719,6 +761,7 @@ public class GenieWheelView : MonoBehaviour
         // for Start. The fill only starts dropping once Start begins the sweep.
         SetMaskFill(1f);
         SetMaskVisible(true);
+        PrepareFreeGamesMasks();
     }
 
     private float AngleForSlice(int sliceIndex)
@@ -757,6 +800,96 @@ public class GenieWheelView : MonoBehaviour
     private void SetMaskVisible(bool visible)
     {
         if (wheelMask != null) wheelMask.gameObject.SetActive(visible);
+    }
+
+    // The parent on at full alpha with every mask off: under the full WheelMask they would only dim
+    // their wedges twice. Each comes on as the sweep uncovers its wedge.
+    private void PrepareFreeGamesMasks()
+    {
+        SetGroup(freeGamesMaskGroup, 1f, true);
+        SetFreeGamesMasksActive(false);
+    }
+
+    // Off, with the alpha put back for next time.
+    private void HideFreeGamesMasks()
+    {
+        SetGroup(freeGamesMaskGroup, 1f, false);
+        SetFreeGamesMasksActive(false);
+    }
+
+    // At-or-past rather than equal, so a frame that skips a step still catches its mask.
+    private void RevealFreeGamesMasks(int lit)
+    {
+        if (freeGamesMasks == null) return;
+
+        foreach (var entry in freeGamesMasks)
+        {
+            if (entry == null || entry.mask == null || entry.mask.activeSelf) continue;
+            if (lit >= entry.revealStep) entry.mask.SetActive(true);
+        }
+    }
+
+    private void SetFreeGamesMasksActive(bool active)
+    {
+        if (freeGamesMasks == null) return;
+
+        foreach (var entry in freeGamesMasks)
+        {
+            if (entry != null && entry.mask != null) entry.mask.SetActive(active);
+        }
+    }
+
+    // The masks are placed by hand over the scene's free-games wedges, but which slices give free
+    // games is the backend's call. Warns when the two disagree, so a changed slice layout can't
+    // silently leave a mask over a cash wedge.
+    private void CheckFreeGamesMasks()
+    {
+        if (freeGamesMasks == null || slices == null) return;
+
+        int count = SliceCount;
+        var maskedSlices = new List<int>();
+        for (int i = 0; i < freeGamesMasks.Length; i++)
+        {
+            var entry = freeGamesMasks[i];
+            if (entry == null) continue;
+
+            if (entry.mask == null)
+            {
+                Debug.LogWarning($"[GenieWheelView] Free Games Masks element {i} has no mask object — that wedge lights with the rest.");
+            }
+
+            if (entry.revealStep < 1 || entry.revealStep > count)
+            {
+                Debug.LogWarning($"[GenieWheelView] Free Games Masks element {i} has reveal step {entry.revealStep}; it must be 1–{count}.");
+                continue;
+            }
+
+            maskedSlices.Add(SliceForRevealStep(entry.revealStep));
+        }
+
+        var freeGamesSlices = new List<int>();
+        for (int i = 0; i < slices.Count; i++)
+        {
+            if (slices[i].type == WheelSliceType.FreeGames) freeGamesSlices.Add(i);
+        }
+
+        maskedSlices.Sort();
+        if (!new HashSet<int>(maskedSlices).SetEquals(freeGamesSlices))
+        {
+            Debug.LogWarning($"[GenieWheelView] The free-games masks sit over slices [{string.Join(", ", maskedSlices)}] " +
+                             $"but the backend's free-games slices are [{string.Join(", ", freeGamesSlices)}]. " +
+                             "Move the masks and their reveal steps to match.");
+        }
+    }
+
+    // The slice the sweep uncovers at a step. The WheelMask lights the wedges clockwise from slice 0
+    // (see its tooltip), so step 1 is slice 0; with the slices numbered anticlockwise, step 2 is the
+    // last slice, and so on.
+    private int SliceForRevealStep(int step)
+    {
+        int count = Mathf.Max(1, SliceCount);
+        int offset = (step - 1) % count;
+        return slicesClockwise ? offset : (count - offset) % count;
     }
 
     private void ResolveSlices()
