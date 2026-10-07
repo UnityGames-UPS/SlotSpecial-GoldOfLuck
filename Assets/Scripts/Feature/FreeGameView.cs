@@ -91,36 +91,22 @@ public class FreeGameView : MonoBehaviour
 
     private Coroutine activeSequence;
     private readonly List<Tween> titleTweens = new List<Tween>();
-    private Tween panelScaleTween;
 
-    // The panel's scene scale, read once at startup: the opening scales it from 0, so reading it on
-    // each open could pick it up mid-scale.
-    private Vector3 panelHomeScale = Vector3.one;
+    // The panel's scale-up / reverse-and-scale-down choreography, shared with the Winner panel. Made
+    // in Awake, which is when it reads the panel's scene scale and the clip's own setup.
+    private PanelClipPlayback congratulationsClip;
 
     // The titles' scene positions, read once at startup — the close slides them to y 0.
     private Vector2 congratulationsTitleHome;
     private Vector2 freeGamesAwardedTitleHome;
 
-    // The clip's own setup, read at startup. The close borrows the component to play the opening
-    // backwards, and these are put back afterwards so the next open plays normally.
-    private List<Sprite> panelClipFrames;
-    private ImageAnimation.AnimationMode panelClipMode;
-    private float panelClipSpeed;
-    private bool panelClipLoops;
-
     private void Awake()
     {
-        if (congratulationsPanel != null) panelHomeScale = congratulationsPanel.transform.localScale;
+        congratulationsClip = new PanelClipPlayback(
+            congratulationsPanel != null ? congratulationsPanel.transform : null, congratulationsPanelAnim);
+
         if (congratulationsTitle != null) congratulationsTitleHome = congratulationsTitle.anchoredPosition;
         if (freeGamesAwardedTitle != null) freeGamesAwardedTitleHome = freeGamesAwardedTitle.anchoredPosition;
-
-        if (congratulationsPanelAnim != null)
-        {
-            panelClipFrames = congratulationsPanelAnim.textureArray;
-            panelClipMode = congratulationsPanelAnim.animationMode;
-            panelClipSpeed = congratulationsPanelAnim.AnimationSpeed;
-            panelClipLoops = congratulationsPanelAnim.doLoopAnimation;
-        }
     }
 
     #region Public API — called by GameManager
@@ -187,34 +173,11 @@ public class FreeGameView : MonoBehaviour
         SetTitleScale(congratulationsTitle, 0f);
         SetTitleScale(freeGamesAwardedTitle, 0f);
 
-        // Held on the clip's first frame while it scales, until the clip is started.
-        if (congratulationsPanelAnim != null) congratulationsPanelAnim.RevertToInitialState();
-
-        Transform panel = congratulationsPanel.transform;
-        panel.localScale = Vector3.zero;
+        // Activated first, in the same frame the scale-up sets it to 0, so it never shows at full size.
         congratulationsPanel.SetActive(true);
+        yield return congratulationsClip.ScaleUpAndPlay(panelScaleUpDuration, clipEarlyStartFrames);
 
-        if (panelScaleUpDuration > 0f)
-        {
-            panelScaleTween = panel.DOScale(panelHomeScale, panelScaleUpDuration).SetEase(Ease.OutBack);
-
-            // The clip starts partway through the scale-up: ImageAnimation draws a two-phase clip's
-            // first frame twice before moving on, so started at full size it would sit still for
-            // about two frames. Started this much early, frame 1 lands as the scale-up ends.
-            float clipStartAt = Mathf.Max(0f, panelScaleUpDuration - ClipEarlyStartTime());
-            if (clipStartAt > 0f) yield return new WaitForSeconds(clipStartAt);
-            StartPanelClip();
-
-            if (panelScaleTween.IsActive()) yield return panelScaleTween.WaitForCompletion();
-            panelScaleTween = null;
-        }
-        else
-        {
-            StartPanelClip();
-        }
-        panel.localScale = panelHomeScale;
-
-        yield return WaitForTitleCue();
+        yield return congratulationsClip.WaitForOpeningCue(titleLeadFrames, TitleCueTimeoutMargin, nameof(FreeGameView));
 
         PopThenPulse(congratulationsTitle, 0f);
         PopThenPulse(freeGamesAwardedTitle, Mathf.Max(0f, titleStagger));
@@ -225,13 +188,11 @@ public class FreeGameView : MonoBehaviour
         // The titles stop pulsing where they are; the scale-down carries them from there.
         AudioManager.Instance?.PlayCongratsClose();
         KillTitleTweens();
-        PlayPanelClipReversed();
 
-        if (panelScaleDownDuration > 0f)
+        // The reverse and the panel's scale-down start together (see PanelClipPlayback).
+        Tween scaleDown = congratulationsClip.ReverseAndScaleDown(panelScaleDownDuration);
+        if (scaleDown != null)
         {
-            // Linear, so it visibly shrinks from the first reversed frame. A wind-up ease (InBack) held
-            // the panel at or above full size for the first ~60%, which read as starting after the reverse.
-            panelScaleTween = panel.DOScale(0f, panelScaleDownDuration).SetEase(Ease.Linear);
             SlideTitleToMiddle(congratulationsTitle);
             SlideTitleToMiddle(freeGamesAwardedTitle);
 
@@ -241,55 +202,17 @@ public class FreeGameView : MonoBehaviour
             ScaleDownWithPanel(freeGamesAwardedTitle);
             ScaleDownWithPanel(awardedSpinsText != null ? awardedSpinsText.rectTransform : null);
 
-            yield return panelScaleTween.WaitForCompletion();
-            panelScaleTween = null;
+            yield return scaleDown.WaitForCompletion();
         }
 
-        // Stopped explicitly: ImageAnimation drives itself with Invoke, so deactivating the object
-        // is not a reliable way to end a clip. StopCongratulationsAnimations puts the clip's own
-        // frames back and every scale and position back to the scene's.
-        if (congratulationsPanelAnim != null) congratulationsPanelAnim.StopAnimation();
+        // StopCongratulationsAnimations puts the clip's own frames back and every scale and position
+        // back to the scene's.
+        congratulationsClip.StopClip();
         StopCongratulationsAnimations();
         congratulationsPanel.SetActive(false);
 
         activeSequence = null;
         onClosed?.Invoke();
-    }
-
-    // Plays the clip's opening backwards, once, on the same component: the opening frames reversed,
-    // single-phase with looping off, so it stops and holds on the opening's first frame. Same
-    // per-frame pace as the opening — a single-phase clip's frame time scales with the length of its
-    // list, so the speed is scaled by the same ratio. RestorePanelClip puts the clip back.
-    private void PlayPanelClipReversed()
-    {
-        ImageAnimation clip = congratulationsPanelAnim;
-        if (clip == null || panelClipFrames == null || panelClipFrames.Count == 0) return;
-
-        int openingFrames = Mathf.Clamp(clip.phase2StartIndex, 0, panelClipFrames.Count);
-        if (openingFrames == 0) return;
-
-        List<Sprite> reversed = panelClipFrames.GetRange(0, openingFrames);
-        reversed.Reverse();
-
-        clip.StopAnimation();
-        clip.textureArray = reversed;
-        clip.animationMode = ImageAnimation.AnimationMode.SINGLE_PHASE;
-        clip.doLoopAnimation = false;
-        clip.AnimationSpeed = panelClipSpeed * openingFrames / panelClipFrames.Count;
-        clip.StartAnimation();
-    }
-
-    // Only when the close swapped the frames — otherwise the clip is already as the scene has it.
-    private void RestorePanelClip()
-    {
-        ImageAnimation clip = congratulationsPanelAnim;
-        if (clip == null || panelClipFrames == null || clip.textureArray == panelClipFrames) return;
-
-        clip.StopAnimation();
-        clip.textureArray = panelClipFrames;
-        clip.animationMode = panelClipMode;
-        clip.doLoopAnimation = panelClipLoops;
-        clip.AnimationSpeed = panelClipSpeed;
     }
 
     private void SlideTitleToMiddle(RectTransform title)
@@ -304,51 +227,6 @@ public class FreeGameView : MonoBehaviour
         if (child == null) return;
 
         titleTweens.Add(child.DOScale(0f, panelScaleDownDuration).SetEase(Ease.Linear));
-    }
-
-    // Started explicitly rather than left to the component's StartOnEnable, so the sequence owns the
-    // timing and a change to that checkbox cannot silently turn the animation off.
-    private void StartPanelClip()
-    {
-        if (congratulationsPanelAnim != null) congratulationsPanelAnim.StartAnimation();
-    }
-
-    private float ClipEarlyStartTime()
-    {
-        ImageAnimation clip = congratulationsPanelAnim;
-        if (clip == null || clip.textureArray == null || clip.textureArray.Count == 0) return 0f;
-
-        return Mathf.Max(0, clipEarlyStartFrames) * FrameTime(clip);
-    }
-
-    // How long a clip holds each frame: (1/24) × the WHOLE list's frame count ÷ AnimationSpeed, in
-    // both phases (see ImageAnimation.CalculateFrameDelay).
-    private static float FrameTime(ImageAnimation clip)
-    {
-        return (1f / 24f) * clip.textureArray.Count / Mathf.Max(0.01f, clip.AnimationSpeed);
-    }
-
-    // Waits until the clip SHOWS the frame titleLeadFrames before its opening ends. Read off the
-    // sprite on screen rather than timed: the clip's frames wait for rendered frames and run long,
-    // which would throw a timed cue several frames out. Reached-or-passed, so a skipped frame can't
-    // miss it. With no usable clip the titles go straight away, and a clip that never gets there is
-    // given up on after its computed opening length plus a margin.
-    private IEnumerator WaitForTitleCue()
-    {
-        ImageAnimation clip = congratulationsPanelAnim;
-        if (!HasOpeningPhase(clip) || clip.rendererDelegate == null) yield break;
-
-        int openingFrames = Mathf.Clamp(clip.phase2StartIndex, 0, clip.textureArray.Count);
-        int cueFrame = Mathf.Max(0, openingFrames - Mathf.Max(0, titleLeadFrames));
-        float timeout = OpeningDuration(clip) + TitleCueTimeoutMargin;
-
-        for (float elapsed = 0f; elapsed < timeout; elapsed += Time.deltaTime)
-        {
-            if (clip.textureArray.IndexOf(clip.rendererDelegate.sprite) >= cueFrame) yield break;
-            yield return null;
-        }
-
-        Debug.LogWarning("[FreeGameView] The congratulations clip never reached its title cue — the titles are shown anyway.");
     }
 
     // Scales up from 0 in place with a slight overshoot, then pulses. The pulse is a separate tween
@@ -372,35 +250,13 @@ public class FreeGameView : MonoBehaviour
         titleTweens.Add(pop);
     }
 
-    // The opening phase's length, worked out from the clip's own settings — used only for the title
-    // cue's timeout.
-    private static float OpeningDuration(ImageAnimation clip)
-    {
-        int openingFrames = Mathf.Clamp(clip.phase2StartIndex, 0, clip.textureArray.Count);
-        int passes = clip.phase1LoopCount;
-
-        return openingFrames * FrameTime(clip) * passes + clip.delayBetweenLoop * Mathf.Max(0, passes - 1);
-    }
-
-    // A clip with an opening that ends. One set to loop forever (phase1LoopCount below 0) never
-    // reaches the end of its opening, so it is treated like no clip at all.
-    private static bool HasOpeningPhase(ImageAnimation clip)
-    {
-        return clip != null
-            && clip.animationMode == ImageAnimation.AnimationMode.TWO_PHASE
-            && clip.textureArray != null && clip.textureArray.Count > 0
-            && clip.phase1LoopCount >= 0;
-    }
-
     // Everything back as the scene has it — scales, the titles' positions, the clip's own frames — so
     // the panel never reopens mid-scale, mid-pulse or mid-close.
     private void StopCongratulationsAnimations()
     {
-        if (panelScaleTween != null) { panelScaleTween.Kill(); panelScaleTween = null; }
+        congratulationsClip.Reset();
         KillTitleTweens();
-        RestorePanelClip();
 
-        if (congratulationsPanel != null) congratulationsPanel.transform.localScale = panelHomeScale;
         SetTitleScale(congratulationsTitle, 1f);
         SetTitleScale(freeGamesAwardedTitle, 1f);
         if (awardedSpinsText != null) awardedSpinsText.rectTransform.localScale = Vector3.one;

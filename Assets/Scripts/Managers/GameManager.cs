@@ -124,7 +124,43 @@ public class GameManager : MonoBehaviour
 //#if UNITY_EDITOR || DEVELOPMENT_BUILD
 //        if (DebugShowCongratulationsOnStart) StartCoroutine(DebugShowCongratulationsAfterStart());
 //#endif
+
+        // Winner panel test trigger — commented out. Uncomment this and the block below to use it.
+//#if UNITY_EDITOR || DEVELOPMENT_BUILD
+//        if (DebugShowWinnerOnStart) StartCoroutine(DebugShowWinnerAfterStart());
+//#endif
     }
+
+    // ── TEMPORARY: Winner panel test trigger — COMMENTED OUT ─────────────────────────────────────────
+    // Opens the Genie Wheel's Winner panel once, shortly after init, so its open, count-up, Take and
+    // close can be checked without landing a wheel feature. Remove once the panel is signed off
+    // (tracked in ToDo.md).
+    //
+    // Editor and development builds only, so a release build can never show it. It goes through the
+    // real WinnerPanelRoutine — ShowWinner, Take on the Spin button once the count-up ends, CloseWinner —
+    // but pays nothing and starts nothing afterwards: no dim, no reset. The state is held out of Idle
+    // while it is up, so a spin can't start underneath it, and the button goes back to Spin after.
+//#if UNITY_EDITOR || DEVELOPMENT_BUILD
+//    private static readonly bool DebugShowWinnerOnStart = true;
+//    private const float DebugWinnerDelay = 1f;
+//    private const double DebugWinnerAmount = 1234.56;
+
+//    private IEnumerator DebugShowWinnerAfterStart()
+//    {
+//        yield return new WaitForSeconds(DebugWinnerDelay);
+
+//        // Only on an idle board — never over a spin that started in the meantime.
+//        if (genieWheelView == null || currentState != GameState.Idle) yield break;
+
+//        Debug.Log($"[GameManager] DEBUG: showing the Winner panel for testing ({DebugWinnerAmount}).");
+//        currentState = GameState.ShowingWin;
+//        yield return WinnerPanelRoutine(DebugWinnerAmount);
+
+//        uiManager.SetSpinButtonMode(UIManager.SpinButtonMode.Spin);
+//        currentState = GameState.Idle;
+//        Debug.Log("[GameManager] DEBUG: Winner panel closed.");
+//    }
+//#endif
 
     // ── TEMPORARY: congratulations panel test trigger — COMMENTED OUT ─────────────────────────
     // Opens the free-games congratulations panel once, shortly after init, so it can be checked

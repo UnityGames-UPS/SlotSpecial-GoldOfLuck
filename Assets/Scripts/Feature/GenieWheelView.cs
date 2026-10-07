@@ -44,8 +44,6 @@ public class GenieWheelView : MonoBehaviour
     // that never starts (no renderer, inactive parent) so the round carries on regardless.
     private const float OneShotTimeoutMargin = 1f;
 
-    private const float WinnerFadeDuration = 0.3f;
-
     [Header("Wheel")]
     [Tooltip("The ContinuousRotator that drifts the wheel all session. Stopped for the feature and restarted by ResumeIdle.")]
     [SerializeField] private ContinuousRotator rotator;
@@ -120,13 +118,16 @@ public class GenieWheelView : MonoBehaviour
     [SerializeField] private CanvasGroup fullScreenDim;
 
     [Header("Winner Panel")]
+    [Tooltip("WinnerPopup: switched on for the panel and off after it. Holds the CanvasGroup below.")]
     [SerializeField] private GameObject winnerPanel;
+    [Tooltip("WinnerPopup's CanvasGroup. Its alpha fades out as the close begins, faster than the scale-down.")]
     [SerializeField] private CanvasGroup winnerPanelGroup;
 
     [Tooltip("The amount that counts up. Written in sprite digits, like the big-win popup.")]
     [SerializeField] private TMP_Text winnerAmountText;
 
-    [Tooltip("The panel's open-then-loop clip. Set it up as TWO_PHASE in the Inspector — the code only starts and stops it.")]
+    [Tooltip("WinnerPanel: the open-then-loop clip, TWO_PHASE. Its object is also what scales — up from 0 on open, " +
+             "down to 0 on close — with WinnerAmount riding along as its child. The close plays its opening backwards.")]
     [SerializeField] private ImageAnimation winnerPanelAnim;
 
     // ── Feel ────────────────────────────────────────────────────────────────────────────────────
@@ -171,8 +172,22 @@ public class GenieWheelView : MonoBehaviour
     [Tooltip("How long the full-screen dim holds, fully up, while the stage changes beneath it.")]
     [SerializeField] private float dimHoldDuration = 0.3f;
 
-    [Tooltip("Winner panel count-up length.")]
+    [Tooltip("Winner panel count-up length. Starts with the panel; Take becomes pressable when it ends.")]
     [SerializeField] private float winnerCountUpDuration = 2f;
+
+    [Tooltip("Seconds WinnerPanel takes to scale up from 0 to its scene scale, with a slight overshoot.")]
+    [SerializeField] private float winnerScaleUpDuration = 0.35f;
+
+    [Tooltip("How many clip frames before the scale-up finishes the Winner clip is started, so its first movement " +
+             "lands as the panel reaches full size (ImageAnimation holds a two-phase clip's first frame for ~2 frames).")]
+    [SerializeField] private int winnerClipEarlyStartFrames = 2;
+
+    [Tooltip("Seconds WinnerPanel takes to scale down to 0 on Take, while its opening plays backwards.")]
+    [SerializeField] private float winnerScaleDownDuration = 1.2f;
+
+    [Tooltip("Seconds WinnerPopup's alpha takes to fade out, from the start of the close. Shorter than the scale-down, " +
+             "so the end of the scale-down is never seen; the close finishes as soon as the panel can't be seen.")]
+    [SerializeField] private float winnerFadeDuration = 0.5f;
 
     [Header("Testing")]
     [Tooltip("Slice for the right-click \"Test Spin\" menu. Play mode only; needs no backend.")]
@@ -195,11 +210,16 @@ public class GenieWheelView : MonoBehaviour
     private Tween spinTween;
     private Tween sweepTween;
     private Tween winnerCountTween;
+    private Tween winnerFadeTween;
     private bool isSpinning;
     private bool curveWarningLogged;
 
     // The backend's slice list when the init has arrived, the scene's slices before that — so
     // "Test Spin" works with no backend at all.
+    // WinnerPanel's scale-up / reverse-and-scale-down choreography, shared with the congratulations
+    // panel. Made in Awake, which is when it reads the panel's scene scale and the clip's own setup.
+    private PanelClipPlayback winnerClip;
+
     private int SliceCount => slices != null && slices.Count > 0 ? slices.Count : sliceRefs.Count;
     private float SliceStep => 360f / Mathf.Max(1, SliceCount);
 
@@ -208,6 +228,8 @@ public class GenieWheelView : MonoBehaviour
     private void Awake()
     {
         ResolveSlices();
+
+        winnerClip = new PanelClipPlayback(winnerPanelAnim != null ? winnerPanelAnim.transform : null, winnerPanelAnim);
 
         if (backgroundImage != null) baseBackground = backgroundImage.sprite;
 
@@ -242,6 +264,8 @@ public class GenieWheelView : MonoBehaviour
         spinTween?.Kill();
         sweepTween?.Kill();
         winnerCountTween?.Kill();
+        winnerFadeTween?.Kill();
+        winnerClip?.Reset();
         if (fullScreenDim != null) fullScreenDim.DOKill();
         if (freeGamesMaskGroup != null) freeGamesMaskGroup.DOKill();
         if (winnerPanelGroup != null) winnerPanelGroup.DOKill();
@@ -496,14 +520,14 @@ public class GenieWheelView : MonoBehaviour
     #region Winner panel — called by GameManager
 
     /// <summary>
-    /// Opens the Winner panel and counts the amount up from 0. onCountUpComplete is the
-    /// controller's cue to put Take on the Spin button; the panel's clip keeps looping until
-    /// CloseWinner.
+    /// Opens the Winner panel: WinnerPanel scales up from nothing with the amount on it, its clip plays
+    /// its opening and then loops until CloseWinner, and the amount counts up from 0 from the start.
+    /// onCountUpComplete is the controller's cue to put Take on the Spin button.
     /// </summary>
     internal void ShowWinner(double amount, Action onCountUpComplete)
     {
         StopSequence(ref winnerSequence);
-        if (winnerCountTween != null) { winnerCountTween.Kill(); winnerCountTween = null; }
+        StopWinnerAnimations();
 
         if (winnerPanel == null)
         {
@@ -511,9 +535,11 @@ public class GenieWheelView : MonoBehaviour
             return;
         }
 
+        // Activated in the same frame the scale-up sets WinnerPanel to 0, so it never shows at full size.
         winnerPanel.SetActive(true);
         SetGroup(winnerPanelGroup, 1f, true);
-        StartLoop(winnerPanelAnim);
+        if (winnerPanelAnim != null) winnerPanelAnim.gameObject.SetActive(true);
+        winnerSequence = StartCoroutine(OpenWinnerRoutine());
         AudioManager.Instance?.PlayWinner();
 
         if (winnerAmountText == null)
@@ -536,7 +562,10 @@ public class GenieWheelView : MonoBehaviour
         });
     }
 
-    /// <summary>Take was pressed: the Winner panel fades out and closes.</summary>
+    /// <summary>
+    /// Take was pressed: the clip's opening plays backwards while WinnerPanel scales down and
+    /// WinnerPopup fades out, and the panel goes as soon as it can't be seen.
+    /// </summary>
     internal void CloseWinner(Action onClosed)
     {
         StopSequence(ref winnerSequence);
@@ -544,7 +573,7 @@ public class GenieWheelView : MonoBehaviour
 
         if (winnerPanel == null || !winnerPanel.activeSelf)
         {
-            StopLoop(winnerPanelAnim);
+            StopWinnerAnimations();
             onClosed?.Invoke();
             return;
         }
@@ -695,19 +724,50 @@ public class GenieWheelView : MonoBehaviour
         onComplete?.Invoke();
     }
 
+    private IEnumerator OpenWinnerRoutine()
+    {
+        yield return winnerClip.ScaleUpAndPlay(winnerScaleUpDuration, winnerClipEarlyStartFrames);
+        winnerSequence = null;
+    }
+
+    // The reverse, the scale-down and the fade all start together. Done as soon as the panel can't be
+    // seen — whichever of the fade or the scale-down ends first — rather than waiting out the rest
+    // of an invisible scale-down before the round moves on.
     private IEnumerator CloseWinnerRoutine(Action onClosed)
     {
-        if (winnerPanelGroup != null)
+        Tween scaleDown = winnerClip.ReverseAndScaleDown(winnerScaleDownDuration);
+
+        winnerFadeTween = null;
+        if (winnerPanelGroup != null && winnerFadeDuration > 0f)
         {
             winnerPanelGroup.DOKill();
-            yield return winnerPanelGroup.DOFade(0f, WinnerFadeDuration).WaitForCompletion();
+            winnerFadeTween = winnerPanelGroup.DOFade(0f, winnerFadeDuration);
         }
 
-        StopLoop(winnerPanelAnim);
+        bool fading = winnerFadeTween != null;
+        bool scaling = scaleDown != null;
+        if (fading || scaling)
+        {
+            yield return new WaitUntil(() =>
+                (fading && !winnerFadeTween.IsActive()) || (scaling && !scaleDown.IsActive()));
+        }
+
+        winnerClip.StopClip();
+        StopWinnerAnimations();
         if (winnerPanel != null) winnerPanel.SetActive(false);
 
         winnerSequence = null;
         onClosed?.Invoke();
+    }
+
+    // Everything back as the scene has it — WinnerPanel's scale, the clip's own frames, the popup's
+    // alpha — so the panel never reopens mid-scale or mid-fade.
+    private void StopWinnerAnimations()
+    {
+        if (winnerCountTween != null) { winnerCountTween.Kill(); winnerCountTween = null; }
+        if (winnerFadeTween != null) { winnerFadeTween.Kill(); winnerFadeTween = null; }
+        winnerClip.Reset();
+        if (winnerPanelGroup != null) winnerPanelGroup.alpha = 1f;
     }
 
     // Plays a clip once and waits for its last frame, which it then holds. onStarted runs the

@@ -30770,7 +30770,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f521a04de7f494272a617b2719edd271, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SocketIOManager
-  testToken: 49b7102c777d4356aebc17632f4d4c48
+  testToken: 7837f70aab834fdb9b12583b63afd6ef
   gameManager: {fileID: 1206269883}
   uiManager: {fileID: 885496184}
   popupManager: {fileID: 1363796882}
@@ -36853,7 +36853,7 @@ MonoBehaviour:
     - {fileID: 297154812}
     - {fileID: 945339329}
   spinSpeed: 6000
-  reelStartStagger: 0.08
+  reelStartStagger: 0
   reelStopStagger: 0.15
   anticipationUpDistance: 30
   anticipationUpDuration: 0.12
@@ -38852,7 +38852,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c59df78acf22b4b7fbed365ceb4e6084, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ContinuousRotator
-  degreesPerSecond: -20
+  degreesPerSecond: -35
   target: {fileID: 1565933572}
   rotateOnAwake: 1
 --- !u!114 &1565933574
@@ -46539,7 +46539,7 @@ MonoBehaviour:
   StartOnAwake: 0
   StartonEnable: 0
   currentAnimationState: 0
-  AnimationSpeed: 30
+  AnimationSpeed: 40
   delayBetweenLoop: 0
   animationMode: 0
   phase2StartIndex: 0
@@ -49772,6 +49772,10 @@ MonoBehaviour:
   dimFadeDuration: 0.4
   dimHoldDuration: 0.3
   winnerCountUpDuration: 2
+  winnerScaleUpDuration: 0.35
+  winnerClipEarlyStartFrames: 2
+  winnerScaleDownDuration: 1.2
+  winnerFadeDuration: 0.5
   testSliceIndex: 0
 --- !u!4 &2068344130
 Transform:
@@ -51346,15 +51350,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ImageAnimation
   textureArray:
-  - {fileID: 21300000, guid: 98de357cfec284068be8e879ea82e84d, type: 3}
-  - {fileID: 21300000, guid: 1949b314893b44b75ab8bad1a97be550, type: 3}
-  - {fileID: 21300000, guid: 20b6f4c8113724c27a5f997f0ee866a9, type: 3}
-  - {fileID: 21300000, guid: 66b7e23e652864a8ba213f2e26cc4aab, type: 3}
-  - {fileID: 21300000, guid: b78ef59f4b9de494894f364edab16f61, type: 3}
-  - {fileID: 21300000, guid: ecc434030218f4ad8a65a681b08479e6, type: 3}
-  - {fileID: 21300000, guid: d47b863e79a364d3eac7151f3ced186a, type: 3}
-  - {fileID: 21300000, guid: 74cf8c16aa08342e3b79dcf37604d697, type: 3}
-  - {fileID: 21300000, guid: b03be8cfd891f48a0a7ad26bbcd1b056, type: 3}
   - {fileID: 21300000, guid: 5e3a2c1277ea14a87917b664e16cbad9, type: 3}
   - {fileID: 21300000, guid: afff2609a7a474354818dba46ce3a28b, type: 3}
   - {fileID: 21300000, guid: 2858e68572b4643e094ab53aedf68db4, type: 3}
@@ -51390,10 +51385,10 @@ MonoBehaviour:
   StartOnAwake: 0
   StartonEnable: 0
   currentAnimationState: 0
-  AnimationSpeed: 35
+  AnimationSpeed: 25
   delayBetweenLoop: 0
   animationMode: 1
-  phase2StartIndex: 25
+  phase2StartIndex: 15
   phase1LoopCount: 1
   phase2LoopCount: -1
   useCustomSpeed: 0
