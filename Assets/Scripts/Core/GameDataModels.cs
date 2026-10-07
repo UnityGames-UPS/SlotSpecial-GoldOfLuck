@@ -72,8 +72,10 @@ public class ServerGameData
     // Total bet = the selected bet x this: 0.01 x 50 = 0.50, the cost of every captured spin.
     public int creditDivisor;
 
-    // "totalLines" is sent as 243 — the WAYS count — and is deliberately unbound. Read as the old
-    // "lines to multiply the bet by" it would make every bet display and deduction 4.86x too high.
+    // The WAYS count (243). Bound for the line-count label ONLY, as GameConfig.waysCount — never a bet
+    // multiplier. Read as the old "lines to multiply the bet by" it would make every bet display and
+    // deduction 4.86x too high; creditDivisor is the multiplier.
+    public int totalLines;
 }
 
 [Serializable]
@@ -318,6 +320,10 @@ public class GameConfig
     // creditDivisor (50), and has nothing to do with the 243 ways.
     public int activeLine = 50;
 
+    // The ways count (243), for the line-count label only — never multiply anything by it. 0 when the
+    // init doesn't send it, and the label then keeps its scene text.
+    public int waysCount;
+
     public List<double> availableBets;
     public List<SymbolInfo> symbols;
 
@@ -538,6 +544,7 @@ public static class InitDataConverter
             reelCount = reelCount,
             rowCount = 3,
             activeLine = betMultiplier,
+            waysCount = gameData != null && gameData.totalLines > 0 ? gameData.totalLines : 0,
             availableBets = gameData?.bets,
             symbols = new List<SymbolInfo>(),
             wheelSlices = ConvertWheelSlices(serverData?.features?.genieWheel),

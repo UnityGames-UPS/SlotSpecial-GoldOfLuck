@@ -24,7 +24,7 @@ public class UIManager : MonoBehaviour
     [SerializeField] private Button betMinusButton;
     [Header("Bet Controls - Portrait")]
     [SerializeField] private TMP_Text betAmountTextPortrait;
-    [Tooltip("Number of paylines currently being bet on. The scene object is named LineCountTxt (1).")]
+    [Tooltip("The ways count (243, from the init). Landscape — unassigned; the portrait field below holds LineCountTxt (1).")]
     [SerializeField] private TMP_Text lineCountText;
     [SerializeField] private TMP_Text lineCountTextPortrait;
     [SerializeField] private Button betPlusButtonPortrait;
@@ -541,13 +541,17 @@ public class UIManager : MonoBehaviour
         UpdateLineCountDisplay();
     }
 
-    // Server-driven and fixed for the session — set once on init rather than per spin.
+    // The ways count, server-driven and fixed for the session — set once on init rather than per spin.
+    // Not activeLine: that is the bet multiplier (50), which means nothing to a player. With no ways
+    // count in the init, the label keeps whatever the scene has.
     private void UpdateLineCountDisplay()
     {
         if (gameManager == null || gameManager.gameConfig == null) return;
 
-        string lines = gameManager.gameConfig.activeLine.ToString();
-        SetTMPText(lineCountText, lineCountTextPortrait, lines);
+        int ways = gameManager.gameConfig.waysCount;
+        if (ways <= 0) return;
+
+        SetTMPText(lineCountText, lineCountTextPortrait, ways.ToString());
     }
 
     internal void OnSpinStarted()
