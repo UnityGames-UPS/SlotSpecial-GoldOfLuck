@@ -16,11 +16,6 @@ public class SymbolInfoCard : MonoBehaviour
     [Tooltip("Sprite used when card is on the LEFT side of symbol (3rd, 4th, 5th reel - pointer points right)")]
     [SerializeField] private Sprite leftSideCardSprite;
 
-    [Tooltip("Alternative inspector alias for pointer pointing left (used for right side placement)")]
-    [SerializeField] private Sprite leftPointSprite;
-    [Tooltip("Alternative inspector alias for pointer pointing right (used for left side placement)")]
-    [SerializeField] private Sprite rightPointSprite;
-
     [Header("Layout & Auto-Close Settings")]
     [Tooltip("Horizontal spacing from symbol center")]
     [SerializeField] private float xSpacing = 160f;
@@ -39,20 +34,6 @@ public class SymbolInfoCard : MonoBehaviour
     private void Awake()
     {
         rectTransform = GetComponent<RectTransform>();
-    }
-
-    private Sprite GetRightSideSprite()
-    {
-        if (rightSideCardSprite != null) return rightSideCardSprite;
-        if (leftPointSprite != null) return leftPointSprite;
-        return null;
-    }
-
-    private Sprite GetLeftSideSprite()
-    {
-        if (leftSideCardSprite != null) return leftSideCardSprite;
-        if (rightPointSprite != null) return rightPointSprite;
-        return null;
     }
 
     public void ShowCard(int symbolId, int colIndex, int rowIndex, RectTransform symbolRect, GameManager gameManager)
@@ -94,7 +75,7 @@ public class SymbolInfoCard : MonoBehaviour
         // 2. Change Sprite Based on Side
         if (cardBgImage != null)
         {
-            Sprite targetSprite = isLeftHalf ? GetRightSideSprite() : GetLeftSideSprite();
+            Sprite targetSprite = isLeftHalf ? rightSideCardSprite : leftSideCardSprite;
             if (targetSprite != null)
             {
                 cardBgImage.sprite = targetSprite;

@@ -59,14 +59,12 @@ public class SlotView : MonoBehaviour
     [Tooltip("Win animation for the x4 Genie. Empty = a winning x4 Genie stays on its static x4 sprite.")]
     [SerializeField] private List<Sprite> animSpritesGenie4;
 
-    // Rect size for each symbol whose art is not drawn to the 175 pitch, keyed by symbol id. Every
-    // id not listed here uses normalSymbolSize.
+    // Rect size for each symbol, keyed by symbol id. Any id not listed here uses normalSymbolSize.
     //
-    // Empty on purpose: the old entries were tuned against Golden Dynasty's art, and the Gold of
-    // Luck art has not been measured yet. Add an entry per symbol as the art comes in, e.g.
-    //     { 8, new Vector2(200f, 200f) },  // Genie
-    // Sizing is per-symbol art, not a role: anything above 175 overlaps its vertical neighbours,
-    // which is intentional bleed but also means it swallows clicks aimed at the cells above and below.
+    // Every symbol is listed: the regular ones at DefaultSymbolSize (200), the Sword at 300, the
+    // Genie at 262.5 and the Lamp at 300×600. Sizing is per-symbol art, not a role: anything above
+    // the 175 pitch overlaps its vertical neighbours, which is intentional bleed but also means it
+    // swallows clicks aimed at the cells above and below.
     //
     // Kept next to the sprite fields on purpose: both are id-keyed maps of the same symbol table, so
     // if the backend ever reorders it they have to be corrected together.
@@ -95,9 +93,9 @@ public class SlotView : MonoBehaviour
     // spin, so leaving one untouched would silently inherit whatever the previous symbol had set
     // on that slot.
     //
-    // All 10 are listed explicitly, at the default, because none has been tuned yet — the old values
-    // were Golden Dynasty's. Retune each against its own clip when the art is in. The fallback below
-    // is only reached if the backend ever sends an id this table doesn't know about.
+    // All 10 are listed explicitly. Only the Lamp has been tuned so far (107); the rest sit at the
+    // default until each is retuned against its own clip. The fallback below is only reached if the
+    // backend ever sends an id this table doesn't know about.
     private const float DefaultSymbolAnimationSpeed = 20f;
     //Animation Speeds
     private static readonly Dictionary<int, float> SymbolAnimationSpeeds = new Dictionary<int, float>
@@ -215,7 +213,7 @@ public class SlotView : MonoBehaviour
     [SerializeField] private GameObject winAnimationLayer;
     [Tooltip("One entry per reel column, each holding the 3 active-row slots top to bottom.")]
     [SerializeField] private List<AnimSlotColumn> animSlotColumns = new List<AnimSlotColumn>(3);
-    [Tooltip("The per-line win amount, ONE PER ROW, top to bottom — element 0 is the top row. This game draws no payline graphics: a line is shown by animating its symbols and putting its payout on the middle reel, so only three positions are ever needed for all 50 lines.")]
+    [Tooltip("The per-line win amount, ONE PER ROW, top to bottom — element 0 is the top row. This game draws no payline graphics: a win is shown by animating its symbols and putting its payout on the middle reel, so only three positions are ever needed.")]
     [SerializeField] private TMPro.TMP_Text[] winLineAmounts = new TMPro.TMP_Text[3];
 
     [Header("Phase 1 Total Win Presentation")]
@@ -290,8 +288,8 @@ public class SlotView : MonoBehaviour
     // totalResponseRowCount / ActiveRowStart pair that translated between those spaces is gone.
     internal int RowCount => (gameManager != null && gameManager.gameConfig != null) ? gameManager.gameConfig.rowCount : 3;
 
-    // -1 rather than 0 when unknown, deliberately: 0 IS the Wild's id in this game, so a literal
-    // fallback would silently match every symbol lookup before init.
+    // -1 rather than 0 when unknown, deliberately: 0 is a real symbol (the Prince), so a literal
+    // fallback would silently match it before init.
     private int WildSymbolId => (gameManager != null && gameManager.gameConfig != null)
         ? gameManager.gameConfig.wildSymbolId
         : -1;
@@ -514,9 +512,8 @@ public class SlotView : MonoBehaviour
         }
     }
 
-    // Writes only the display-block sprites (no buffer reshuffle, no position touch) — used by
-    // SetReelSymbols above and, standalone, by the early result-preload path, which deliberately
-    // must not trigger a buffer reshuffle mid-spin.
+    // Writes only the display-block sprites (no buffer reshuffle, no position touch). Called from
+    // SetReelSymbols above.
     private void WriteDisplayBlockSprites(int columnIndex, List<int> visibleSymbolIds)
     {
         if (columnIndex >= reelImagesList.Count) return;
@@ -548,7 +545,7 @@ public class SlotView : MonoBehaviour
     }
 
     // flatIndex is the cell being drawn, or -1 for a write with no cell behind it (the scroll
-    // buffer, a Hold & Spin filler). It exists only for the Genie, whose art depends on the
+    // buffer). It exists only for the Genie, whose art depends on the
     // multiplier the server attached to that cell rather than on its symbol id.
     private Sprite GetSymbolSprite(int symbolId, int flatIndex = -1)
     {
@@ -636,10 +633,10 @@ public class SlotView : MonoBehaviour
     }
 
     // Single place that puts a symbol onto an icon. Sprite and size are set together on purpose:
-    // the Bonus symbol's art is drawn at a different scale to the rest, so it needs a larger rect.
-    // Because every write goes through here and always sets one size or the other, an icon that
-    // showed a Bonus is snapped back to normal as soon as it's given any other symbol — no reset
-    // pass to maintain and no way for an icon to get stuck oversized.
+    // symbols are drawn at different scales (the Lamp and Genie above all), so each needs its own
+    // rect. Because every write goes through here and always sets a size, an icon that showed an
+    // oversized symbol is snapped back as soon as it's given any other — no reset pass to maintain
+    // and no way for an icon to get stuck oversized.
     //
     // flatIndex is passed only by the callers that know which cell they are drawing, and only the
     // Genie reads it — see GetGenieMultiplierSprite. Left at -1 the behaviour is exactly as before.
@@ -649,13 +646,9 @@ public class SlotView : MonoBehaviour
 
         image.sprite = GetSymbolSprite(symbolId, flatIndex);
 
-        // Sizing is art-driven, not role-driven: a few symbols are drawn larger than the pitch and
-        // the rest are not, which is why this reads an id-keyed map rather than keying off
-        // scatterSymbolId the way it did when exactly one symbol needed its own size.
-        //
-        // Anything above 175 overlaps its vertical neighbours — 262.5 stands ~44px into each — which
-        // is intentional art bleed, but also means those symbols swallow clicks aimed at the ones
-        // above and below them.
+        // Sizing is art-driven, not role-driven, which is why this reads an id-keyed map. Anything
+        // above 175 overlaps its vertical neighbours, which is intentional art bleed, but also means
+        // those symbols swallow clicks aimed at the ones above and below them.
         image.rectTransform.sizeDelta = SymbolSizeOverrides.TryGetValue(symbolId, out Vector2 size)
             ? size
             : normalSymbolSize;
@@ -667,10 +660,8 @@ public class SlotView : MonoBehaviour
         // win-animation layer's slots are authored raycast-off and have to stay that way (they sit
         // above the reels during a win), and the scroll buffer has no info card to open.
         //
-        // This used to switch on the blank symbol, which no longer exists — Sizzling 7s spaced its
-        // symbols with blanks whose oversized rects straddled two neighbours and swallowed their
-        // clicks. Golden Dynasty has no blanks, but note the four 262.5-tall symbols overlap their
-        // neighbours the same way, so the same click-stealing is possible from those.
+        // Oversized symbols (see the size table) overlap their neighbours, so they can steal clicks
+        // aimed at the cells above and below.
         if (manageRaycast)
         {
             image.raycastTarget = true;
@@ -914,8 +905,8 @@ public class SlotView : MonoBehaviour
     /// <item>2nd scatter on the last reel — no reels follow it to hold.</item>
     /// <item>All 3 on the last reel — the count is 0 everywhere before it.</item>
     /// </list>
-    /// One known gap, deliberately left (see TODO.md): a single early scatter followed by two on
-    /// the last reel gives no build-up, because the count before that reel is only 1.
+    /// The backend allows at most one Lamp per reel, and only on reels 3–5, so "two have landed"
+    /// always means the next reel is the one that can complete the trigger.
     /// </summary>
     private void ComputeAnticipatedReels(List<List<int>> resultMatrix, HashSet<int> results)
     {
@@ -1163,9 +1154,6 @@ public class SlotView : MonoBehaviour
     // no warning — and the clip played on the reel itself, BELOW the win dim, so anything holding
     // the dim up would leave the scatters dark for the whole trigger sequence.
     //
-    // The dim is deliberately NOT raised here. AnimateAllScatters opens with KillWinTweens, which
-    // lowers it, and the scatter trigger is meant to play over a normal board rather than a
-    // darkened one.
     private void AnimateSymbolSingleLoop(int column, int row, int loopCount = 1, bool playOnce = false)
     {
         if (currentDisplayMatrix == null) return;
@@ -1205,8 +1193,8 @@ public class SlotView : MonoBehaviour
         // darkened board — that pairing is what makes a symbol pop — and AnimateAllScatters lowers
         // the dim on its way in via KillWinTweens, so raising it here is what puts it back.
         //
-        // It stays up for the whole wait: the hold, the prompt appearing, and however long the
-        // player takes to press Start. DisableAllOverlays on the first free spin takes it down.
+        // It stays up until KillWinTweens takes it down: ClearTriggerAnimation under the Genie
+        // Wheel's entry animation, or the next StartSpin after a free-spins retrigger.
         if (winAnimationLayer != null) winAnimationLayer.SetActive(true);
         if (winDimOverlay != null) winDimOverlay.SetActive(true);
 
@@ -1295,51 +1283,6 @@ public class SlotView : MonoBehaviour
         lineWalkRequested = false;
 
         int rowLimit = (gameManager != null && gameManager.gameConfig != null) ? gameManager.gameConfig.rowCount : 3;
-
-        // Was a feature triggered on this spin? Computed up here rather than between the phases,
-        // because it now decides whether EITHER phase runs.
-        //
-        // A retrigger (spinsAwarded during a free spin) is deliberately not counted: the round is
-        // already running and has no separate trigger sequence to make way for.
-        // Gated on the controller's master switch, so a feature that is switched off does not make
-        // this skip the win presentation for a trigger the controller will never act on.
-        //
-        // In Gold of Luck this cannot currently fire. Free Games is only awarded by a Genie Wheel
-        // landing, and a wheel trigger spin never reaches this method — GameManager takes it over in
-        // PresentSpinOutcome. Kept, with its skip, for a trigger that does present through here.
-        bool freeGamesTriggered = GameManager.FreeGamesEnabled && gameManager != null && gameManager.lastResult != null
-            && gameManager.lastResult.freeGame != null
-            && gameManager.lastResult.freeGame.spinsAwarded
-            && !gameManager.lastResult.freeGame.isFreeGame;
-
-        bool hasSpecialFeature = freeGamesTriggered;
-
-        // A triggering spin skips the win presentation entirely and hands straight over to the
-        // feature's own opening — the scatters animating, for Free Games.
-        //
-        // Phase 2 was already skipped for these; Phase 1 was not, so a trigger that also paid a
-        // line sat through three full loops of its slowest winning symbol first — roughly five
-        // seconds of ordinary win animation before the feature could start. The line still pays and
-        // the balance still moves; it simply gets no animation, because the trigger owns the screen.
-        //
-        // onComplete still fires, so the hand-off through ProcessSpecialFeaturesAfterWin is intact.
-        if (hasSpecialFeature)
-        {
-            winAnimationCoroutine = null;
-
-            // Same asymmetry the Phase 2 skip had, for the same reason: a Free Games trigger is left
-            // alone because AnimateAllScatters immediately does its own KillWinTweens. A trigger
-            // that does NOT touch the win layer has to come through here instead, or a dim raised
-            // earlier in the spin would sit over the whole feature.
-            if (!freeGamesTriggered)
-            {
-                ReleaseHeldDim();
-                KillWinTweens();
-            }
-
-            onComplete?.Invoke();
-            yield break;
-        }
 
         // ==========================================
         // PHASE 1: Show all winning icons at once
@@ -1525,12 +1468,9 @@ public class SlotView : MonoBehaviour
             if (col >= currentDisplayMatrix.Count || matrixRow >= currentDisplayMatrix[col].Count) continue;
             int symbolId = currentDisplayMatrix[col][matrixRow];
 
-            // The Bonus never takes part in a line win, but the server lists every cell a payline
-            // passes through — not just the ones that paid — so a Bonus standing on a wild-driven
-            // line arrives here like any other winning symbol. Leaving it dimmed is correct: it
-            // didn't win, and it has its own presentation via AnimateAllScatters when three of
-            // them actually trigger the feature.
-            // (Blanks reach here the same way and are still lit; deliberately left for later.)
+            // A guard: the Lamp (scatter) never takes part in a ways win, so if the server ever lists
+            // one among a win's positions it is left dimmed. It has its own presentation via
+            // AnimateAllScatters when the Lamps trigger the Genie Wheel.
             int winBonusId = (gameManager != null && gameManager.gameConfig != null)
                 ? gameManager.gameConfig.scatterSymbolId
                 : -1;
@@ -1818,19 +1758,15 @@ public class SlotView : MonoBehaviour
         }
     }
 
-    // Raises one payline graphic and writes that line's own payout onto it. Indexed straight off
-    // the server's lineIndex, so there's no naming convention or lookup table to keep in step with
-    // the backend.
     /// <summary>
-    /// Shows one win line's payout. There is no payline graphic in this game — a line is presented
-    /// by animating its symbols, and this is the only thing drawn on top of them.
+    /// Shows one win's payout. There is no payline graphic in this game — a win is presented by
+    /// animating its symbols, and this is the only thing drawn on top of them.
     ///
-    /// The amount sits on the MIDDLE REEL, at whatever row this line occupies there, which is why
-    /// three labels cover all 50 paylines. Read from the win's own positions rather than the payline
-    /// table, so it follows what is actually animating.
+    /// The amount sits on the MIDDLE REEL, at the first row this win occupies there, which is why
+    /// three labels cover every win. Read from the win's own positions, so it follows what is
+    /// actually animating.
     ///
-    /// Wins that never reach the middle reel — Wild and Warriors both pay on two symbols, which
-    /// covers reels 1 and 2 only — fall back to the middle row.
+    /// A win that never reaches the middle reel falls back to the middle row.
     /// </summary>
     private void ShowWinLine(WinLine winLine)
     {
@@ -1910,18 +1846,6 @@ public class SlotView : MonoBehaviour
     }
 
     #endregion
-
-
-    
-    internal List<List<int>> GetCurrentDisplayMatrix()
-    {
-        return currentDisplayMatrix;
-    }
-
-    internal bool IsSpinning()
-    {
-        return isSpinning;
-    }
 
 
     private void KillAllTweens()

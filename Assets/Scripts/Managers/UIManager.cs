@@ -24,7 +24,7 @@ public class UIManager : MonoBehaviour
     [SerializeField] private Button betMinusButton;
     [Header("Bet Controls - Portrait")]
     [SerializeField] private TMP_Text betAmountTextPortrait;
-    [Tooltip("Number of paylines currently being bet on. Scene objects are named LIneCountTxt (note the capital I).")]
+    [Tooltip("Number of paylines currently being bet on. The scene object is named LineCountTxt (1).")]
     [SerializeField] private TMP_Text lineCountText;
     [SerializeField] private TMP_Text lineCountTextPortrait;
     [SerializeField] private Button betPlusButtonPortrait;
@@ -40,8 +40,6 @@ public class UIManager : MonoBehaviour
     [SerializeField] private TMP_Text winAmountTextPortrait;
     [SerializeField] private GameObject winTextObjectPortrait;
     [SerializeField] private GameObject goodLuckObjectPortrait;
-
-    [SerializeField] private CanvasGroup transitionBackFilm;
 
     [Header("Universal Win Popup")]
     [SerializeField] private GameObject universalWinPopup;
@@ -62,7 +60,7 @@ public class UIManager : MonoBehaviour
     [Tooltip("Landscape and portrait share these — both buttons use the same art.")]
     [SerializeField] private ButtonSpriteSet spinSprites;
     [SerializeField] private ButtonSpriteSet stopSprites;
-    [Tooltip("Shared by the free-games summary Take and the big-win popup Take.")]
+    [Tooltip("Shared by the Genie Wheel Winner panel's Take and the big-win popup Take.")]
     [SerializeField] private ButtonSpriteSet takeSprites;
     [SerializeField] private ButtonSpriteSet startSprites;
     [SerializeField] private ButtonSpriteSet autoplayStopSprites;
@@ -199,7 +197,6 @@ public class UIManager : MonoBehaviour
     private float lastRapidStopTime = -99f;
 
     [Header("UI State")]
-    private double currentWinDisplayValue = 0;
     private bool isSpecialWinActive = false;
     public bool IsSpecialWinActive => isSpecialWinActive;
 
@@ -207,9 +204,6 @@ public class UIManager : MonoBehaviour
     private System.Action universalWinPopupCallback;
     private Coroutine uwpAutoCloseCoroutine;
     private Tween uwpWinTween;
-    // Which popup is currently open — BigWin uses its own open/close animation, so the close
-    // path (which has no type parameter of its own) needs to know what was shown.
-    private WinPopupType currentPopupType;
     // The amount the count-up is heading for. Taking early kills that tween mid-number, so the
     // close path needs the target to snap the label to before it collapses.
     private double uwpTargetWinAmount;
@@ -271,7 +265,6 @@ public class UIManager : MonoBehaviour
         if (uwpWinTween != null) { uwpWinTween.Kill(); uwpWinTween = null; }
         if (universalWinPopup) universalWinPopup.SetActive(false);
 
-        if (transitionBackFilm) transitionBackFilm.gameObject.SetActive(false);
         UpdatePingDisplay("-- ms");
     }
 
@@ -542,7 +535,6 @@ public class UIManager : MonoBehaviour
 
     internal void OnGameInitialized()
     {
-        currentWinDisplayValue = 0;
         UpdateBetDisplay();
         UpdateBalanceDisplay();
         UpdateWinDisplay(0);
@@ -562,7 +554,7 @@ public class UIManager : MonoBehaviour
     {
         AudioManager.Instance?.PlaySpinStart();
 
-        // Free games hold the button in an explicit mode, so this only decides the interactable
+        // Free spins show the plain Spin button, greyed out, so this only decides the interactable
         // flag. It must stay false for the whole round, or a spin inside it would re-enable a button
         // the round has deliberately taken over.
         if (gameManager.isInFreeSpins)
@@ -748,9 +740,10 @@ public class UIManager : MonoBehaviour
     /// </summary>
     internal void SetSpinStopButtonStates(bool isSpinningState, bool isInteractable)
     {
-        // Free-games and big-win modes are owned by whoever set them and outlive the spin events
-        // that would otherwise reset the button — the closing summary in particular has to hold
-        // Take through its count-up. Only the interactable flag is honoured while one is active.
+        // Explicit modes (big-win Take, the Genie Wheel's Start and Winner Take) are owned by whoever
+        // set them and outlive the spin events that would otherwise reset the button — the Winner
+        // panel in particular has to hold Take through its count-up. Only the interactable flag is
+        // honoured while one is active.
         if (IsExplicitMode(spinButtonMode))
         {
             SetButtonInteractable(spinButton, spinButtonPortrait, isInteractable);
@@ -1190,7 +1183,7 @@ public class UIManager : MonoBehaviour
 
     #endregion
 
-    #region Free Games Button Modes
+    #region Spin Button Modes
 
     // Every state the one shared button can be in. Spin/Stop/AutoplayStop used to be separate
     // GameObjects toggled by SetActive; the free-games and big-win states were sprite swaps on the
@@ -1417,7 +1410,6 @@ public class UIManager : MonoBehaviour
 
     private void UpdateWinDisplay(double amount)
     {
-        currentWinDisplayValue = amount;
         if (winAmountText) winAmountText.text = FormatAmount(amount);
         if (winAmountTextPortrait) winAmountTextPortrait.text = "WIN " + FormatAmount(amount);
 
@@ -1490,7 +1482,6 @@ public class UIManager : MonoBehaviour
         AudioManager.Instance?.PlayBigWin();
         isSpecialWinActive = true;
         universalWinPopupCallback = onTakePressed;
-        currentPopupType = type;
         uwpTargetWinAmount = winAmount;
 
         if (uwpWinTween != null)
@@ -1498,8 +1489,6 @@ public class UIManager : MonoBehaviour
             uwpWinTween.Kill();
             uwpWinTween = null;
         }
-
-        if (bigWinAmount) bigWinAmount.gameObject.SetActive(false);
 
         if (bigWinAmount)
         {
@@ -1518,18 +1507,10 @@ public class UIManager : MonoBehaviour
             universalWinPopupRect.localScale = Vector3.zero;
             Sequence openSeq = DOTween.Sequence();
 
-            if (type == WinPopupType.BigWin)
-            {
-                // Fast snap in, then a slow constant swell that runs until just before the
-                // auto-close (0.5s pop + 4s swell + 0.5s hold = uwpAutoCloseDelay). No overshoot.
-                openSeq.Append(universalWinPopupRect.DOScale(1.1f, 0.5f).SetEase(Ease.OutQuad));
-                openSeq.Append(universalWinPopupRect.DOScale(1.5f, 4f).SetEase(Ease.Linear));
-            }
-            else
-            {
-                openSeq.Append(universalWinPopupRect.DOScale(1.2f, 0.5f).SetEase(Ease.OutCubic));
-                openSeq.Append(universalWinPopupRect.DOScale(1f, 0.3f).SetEase(Ease.InOutSine));
-            }
+            // Fast snap in, then a slow constant swell that runs until just before the
+            // auto-close (0.5s pop + 4s swell + 0.5s hold = uwpAutoCloseDelay). No overshoot.
+            openSeq.Append(universalWinPopupRect.DOScale(1.1f, 0.5f).SetEase(Ease.OutQuad));
+            openSeq.Append(universalWinPopupRect.DOScale(1.5f, 4f).SetEase(Ease.Linear));
         }
 
         if (bigWinAmount != null && bigWinAmount.gameObject.activeSelf && winAmount > 0)
@@ -1539,7 +1520,7 @@ public class UIManager : MonoBehaviour
             // number counted as integers — the same inconsistency the money format now removes.
             bigWinAmount.text = SpriteTextFormatter.ToSpriteMoney(0);
 
-            float countUpDuration = (type == WinPopupType.BigWin) ? 3.8f : 1.0f;
+            float countUpDuration = 3.8f;
 
             // The count-up cue. No explicit wait for the landing cues to finish — this popup opens
             // seconds after the reels stop, so they are long done by the time it runs.
@@ -1620,16 +1601,8 @@ public class UIManager : MonoBehaviour
 
             Sequence closeSeq = DOTween.Sequence();
 
-            if (currentPopupType == WinPopupType.BigWin)
-            {
-                // Straight collapse from wherever the swell left it — no anticipation bump.
-                closeSeq.Append(universalWinPopupRect.DOScale(0f, 0.5f).SetEase(Ease.InQuad));
-            }
-            else
-            {
-                closeSeq.Append(universalWinPopupRect.DOScale(1.1f, 0.1f));
-                closeSeq.Append(universalWinPopupRect.DOScale(0f, 0.2f).SetEase(Ease.InBack));
-            }
+            // Straight collapse from wherever the swell left it — no anticipation bump.
+            closeSeq.Append(universalWinPopupRect.DOScale(0f, 0.5f).SetEase(Ease.InQuad));
 
             closeSeq.OnComplete(() =>
             {

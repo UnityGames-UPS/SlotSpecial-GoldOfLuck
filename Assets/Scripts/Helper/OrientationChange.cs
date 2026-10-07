@@ -5,7 +5,7 @@ using System.Collections;
 
 public class OrientationChange : MonoBehaviour
 {
-    // Golden Dynasty is portrait-only, so nothing here rotates. The version this was taken from
+    // Gold of Luck is portrait-only, so nothing here rotates. The version this was taken from
     // forced landscape by turning the UI 90 degrees on tall screens; that rotation, and the
     // UIWrapper it acted on, are gone. All that adapts is the CanvasScaler's match value, which
     // letterboxes the 1080x1920 canvas — side margins on a wide desktop window, full-screen on a

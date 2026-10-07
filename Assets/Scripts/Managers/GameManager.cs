@@ -59,11 +59,11 @@ public class GameManager : MonoBehaviour
     internal bool isInFreeSpins;
     internal int freeSpinsRemaining;      // server-authoritative, already decremented for this spin
     internal int freeSpinsUsed;           // counted here — one per free spin actually played
-    internal double freeSpinsRoundWin;    // server-authoritative, from features.freeGame.totalRoundWin
+    internal double freeSpinsRoundWin;    // server-authoritative, from payload.freeGames.totalFreeGamesWin
 
     // Total spins the round has awarded, including every retrigger. Derived rather than tracked:
-    // the server never sends an award size, but used + remaining is always the total, and it
-    // self-corrects if a response is ever missed.
+    // the server sends "totalAwarded" too, but it is left unbound — used + remaining is always the
+    // total, and it self-corrects if a response is ever missed.
     internal int FreeSpinsTotalAwarded => freeSpinsUsed + freeSpinsRemaining;
 
     // A retrigger landed and its Lamps have not been shown yet — the counter waits for them.

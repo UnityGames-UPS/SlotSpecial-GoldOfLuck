@@ -106,17 +106,6 @@ public class FreeGameView : MonoBehaviour
         if (counterPanel != null) counterPanel.SetActive(false);
     }
 
-    /// <summary>Puts everything back the way the base game expects it. Safe to call at any point.</summary>
-    internal void ResetToDefault()
-    {
-        StopActiveSequence();
-        HideCounter();
-
-        if (congratulationsPanelAnim != null) congratulationsPanelAnim.StopAnimation();
-        StopTitleAnimations();
-        if (congratulationsPanel != null) congratulationsPanel.SetActive(false);
-    }
-
     #endregion
 
     #region Sequences

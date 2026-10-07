@@ -57,14 +57,11 @@ public class AudioManager : MonoBehaviour
     [SerializeField] private AudioClip clipAutoplayPanelOpen;
     [SerializeField] private AudioClip clipWinPresentationStart;
     [SerializeField] private AudioClip clipReelStop;
-    [Tooltip("One shot per reel that lands at least one Scatter. Currently UNASSIGNED and silent - kept because the call site is guarded and may be wanted again.")]
+    [Tooltip("One shot per reel that lands at least one Scatter (Lamp).")]
     [SerializeField] private AudioClip clipScatterLand;
     [SerializeField] private AudioClip clipTurboButton;
 
     [Header("Audio Clips - Golden Dynasty")]
-    [Tooltip("The free-games congratulations panel opening.")]
-    [SerializeField] private AudioClip clipCongratulations;
-
     [Tooltip("Phase 2 of the win presentation moving to the next win line. Fires on every change, and Phase 2 cycles until the player spins.")]
     [SerializeField] private AudioClip clipWinLineChange;
 
@@ -75,6 +72,9 @@ public class AudioManager : MonoBehaviour
     [SerializeField] private AudioClip clipWinCountUp;
 
     [Header("Audio Clips - Gold of Luck")]
+    [Tooltip("The free-games congratulations panel opening.")]
+    [SerializeField] private AudioClip clipCongratulations;
+
     [Tooltip("The Genie Wheel's Winner panel opening — after a cash landing, and at the end of the free-games round.")]
     [SerializeField] private AudioClip clipWinner;
 
@@ -246,11 +246,6 @@ public class AudioManager : MonoBehaviour
         bgMusicSource.Play();
     }
 
-    internal void StopBgMusic()
-    {
-        StopSource(bgMusicSource);
-    }
-
     // 2. Bet Plus / Bet Minus (one for both)
     internal void PlayBetPlusMinus()
     {
@@ -379,9 +374,9 @@ public class AudioManager : MonoBehaviour
     internal void PlayWinLineChange()      => PlayUISound(clipWinLineChange);
     internal void PlayWildAnimate()        => PlayUISound(clipWildAnimate);
     internal void PlayWinCountUp()         => PlayUISound(clipWinCountUp);
-    internal void PlayCongratulations() => PlayUISound(clipCongratulations);
 
     // 18. Gold of Luck cues.
+    internal void PlayCongratulations() => PlayUISound(clipCongratulations);
     internal void PlayWinner()     => PlayUISound(clipWinner);
     internal void PlayWheelSweep() => PlayUISound(clipWheelSweep);
     internal void PlayWheelWin()   => PlayUISound(clipWheelWin);

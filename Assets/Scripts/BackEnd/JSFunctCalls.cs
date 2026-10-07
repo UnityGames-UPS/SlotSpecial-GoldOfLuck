@@ -21,13 +21,6 @@ public class JSFunctCalls : MonoBehaviour
 
   #endregion
 
-  #region Unity Lifecycle
-  // Start, not Awake: OrientationChange's Awake must run before the initial dimensions callback.
-  private void Start()
-  {
-  }
-  #endregion
-
   #region Public API
   internal void SendCustomMessage(string message)
   {

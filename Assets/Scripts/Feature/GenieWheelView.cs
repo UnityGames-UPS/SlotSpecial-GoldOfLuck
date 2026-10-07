@@ -17,8 +17,8 @@ using TMPro;
 /// it was given. DEGRADATION IS A RULE: an unwired reference or a clip with no frames falls
 /// straight through to its callback, so a missing asset can never stall the round.
 ///
-/// Attach to an object that stays active for the whole session (WheelBackground, not Wheel or
-/// SlotObject): switching this object off would halt its coroutines mid-sequence.
+/// Lives on its own always-active object (GenieWheelManager), never on Wheel, WheelBackground or
+/// SlotObject: switching this object off would halt its coroutines mid-sequence.
 ///
 /// ONE WRITER AT A TIME. The background drift (ContinuousRotator) and the result spin write the
 /// same localRotation, so every path that moves the wheel stops the drift first, and only

@@ -93,7 +93,8 @@ public class ServerGenieWheelFeature
 
     // Sent and deliberately unbound: "enabled", "symbolId" (9, the Lamp — found through the symbol
     // table's group instead), "minTrigger" (3) and "requiredReels" ([2,3,4], zero-based, so reels 3,
-    // 4 and 5). requiredReels is the rule the scatter anticipation will need when it is reworked.
+    // 4 and 5). The anticipation doesn't need requiredReels: the backend only puts Lamps on those
+    // reels, so counting landed Lamps gives the same answer.
 }
 
 [Serializable]
@@ -122,10 +123,11 @@ public class ServerGenieWildFeature
 [Serializable]
 public class ServerFreeGamesFeature
 {
-    // Only the cap is bound. "payMultiplier" is sent (1) but appliedMultiplier reads 1 on every
-    // captured win, free games included, and the win amounts arrive already multiplied. The old
-    // triggerCount / awardedCount / retriggerCount are gone: the wheel decides what a trigger awards.
-    public int maxTotalFreeGames;
+    // Nothing is bound. "maxTotalFreeGames" (the cap on one round, retriggers included) is sent and
+    // deliberately unbound: the server enforces it, and the client only shows what each spin reports.
+    // "payMultiplier" is sent (1) but appliedMultiplier reads 1 on every captured win, free games
+    // included, and the win amounts arrive already multiplied. The old triggerCount / awardedCount /
+    // retriggerCount are gone: the wheel decides what a trigger awards.
 }
 
 [Serializable]
@@ -255,10 +257,9 @@ public class ServerWheelResult
     public double coinAwarded;
     public int multiplierAwarded;
     public int freeGamesAwarded;
-    // The prize in cash, already inside grandTotalWin. For a MULTIPLIER slice it is multiplierAwarded
-    // x the TOTAL bet, even on a free spin (x3 at a 10.00 bet = 30.00). What a COIN slice pays is not
-    // yet confirmed — no coin landing has been captured — which is exactly why the client always shows
-    // this figure rather than computing one.
+    // The prize in cash, already inside grandTotalWin. A MULTIPLIER slice carries a coin as well and
+    // pays coin x multiplierAwarded x the TOTAL bet, even on a free spin. The client never computes
+    // this figure — it always shows what the server sends here.
     public double winInCash;
 }
 
@@ -268,7 +269,7 @@ public class ServerFreeGamesResult
     // Spins played so far INCLUDING this one: 0 on the spin that triggers a round, 3 on the last of
     // three. After the spin, like remaining.
     public int played;
-    // Spins left after this one. 3 on the trigger spin itself.
+    // Spins left after this one. On the trigger spin itself, the whole award.
     public int remaining;
     // The round's running total: the sum of the FREE spins' wins. The trigger spin's own win is
     // not in it — it reads 0 there.
@@ -324,8 +325,6 @@ public class GameConfig
     public List<WheelSlice> wheelSlices;
     // The multipliers a Genie can carry, for describing the feature.
     public List<int> wildMultipliers;
-    // Cap on spins one round can accumulate, retriggers included.
-    public int maxTotalFreeGames;
 
     // Resolved from the init symbol table. -1 means "not present", so an unresolved role can never
     // collide with a real symbol id the way a 0 default would — and -1 stays meaningful downstream:
@@ -340,12 +339,9 @@ public class SymbolInfo
 {
     public int id;
     public string name;
-    public string displayName;
     // Descending from a full-reel match: index 0 = reelCount-of-a-kind, 1 = one fewer, and so on.
     // In credits — multiply by the selected bet for cash.
     public List<double> multipliers;
-    // Always empty here: no symbol pays on scatter count. Kept for the info card's scatter branch.
-    public List<double> scatterMultipliers;
 
     public bool isWild;
     public bool isScatter;
@@ -368,9 +364,10 @@ public class WheelSlice
 {
     public int sliceIndex;
     public WheelSliceType type;
-    // The coin value as the init sends it. What it pays in cash is unconfirmed (see ServerWheelResult).
+    // The coin value as the init sends it. A MULTIPLIER slice carries one too. What a landing pays
+    // in cash is always the server's figure (see ServerWheelResult).
     public double coin;
-    // Times the TOTAL bet.
+    // Applied to the slice's coin: coin x multiplier x the TOTAL bet.
     public int multiplier;
     public int freeGames;
 }
@@ -472,9 +469,10 @@ public class GenieWheelData
     // Indexes GameConfig.wheelSlices.
     public int sliceIndex;
     public WheelSliceType type;
-    // Only the one matching the type is non-zero.
+    // Which are set depends on the type: COIN has a coin, FREE_GAMES has freeGames, and MULTIPLIER
+    // has both a coin and a multiplier.
     public double coin;
-    public int multiplier;       // times the total bet
+    public int multiplier;       // applied to the coin
     public int freeGames;        // spins awarded
     // The cash prize, already inside SpinResult.winAmount. Always the server's figure — show this,
     // never a value derived from coin or multiplier.
@@ -491,8 +489,7 @@ public enum GameState
     Idle,
     Spinning,
     Stopping,
-    ShowingWin,
-    FreeSpinMode
+    ShowingWin
 }
 
 public enum SpinSpeed
@@ -544,8 +541,7 @@ public static class InitDataConverter
             availableBets = gameData?.bets,
             symbols = new List<SymbolInfo>(),
             wheelSlices = ConvertWheelSlices(serverData?.features?.genieWheel),
-            wildMultipliers = serverData?.features?.genieWild?.multipliers ?? new List<int>(),
-            maxTotalFreeGames = serverData?.features?.freeGames?.maxTotalFreeGames ?? 0
+            wildMultipliers = serverData?.features?.genieWild?.multipliers ?? new List<int>()
         };
 
         if (config.availableBets == null || config.availableBets.Count == 0)
@@ -578,9 +574,7 @@ public static class InitDataConverter
             {
                 id = serverSymbol.id,
                 name = serverSymbol.name,
-                displayName = serverSymbol.name,
                 multipliers = multipliers,
-                scatterMultipliers = new List<double>(),
                 isWild = group == "wild",
                 isScatter = group == "scatter",
                 minMatch = payout.Count > 0 ? serverSymbol.minMatch : 0
