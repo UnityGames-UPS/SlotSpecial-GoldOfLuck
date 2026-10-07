@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
+using DG.Tweening;
 
 /// <summary>
 /// Presentation for the Free Games round: the congratulations panel that announces the award, and
@@ -17,12 +19,15 @@ using UnityEngine;
 public class FreeGameView : MonoBehaviour
 {
     [Header("Counter")]
-    [Tooltip("The panel above the slot for the whole round: a \"FREE GAME\" label plus the counter text. " +
-             "The label is part of the panel — only the counter is written.")]
+    [Tooltip("The panel above the slot for the whole round: a \"FREE GAME\" label, the two numbers, and a " +
+             "static \"/\" between them. The label and the \"/\" are part of the panel — only the numbers are written.")]
     [SerializeField] private GameObject counterPanel;
 
-    [Tooltip("Written as \"remaining/total\" in a normal font, e.g. 10/10, 9/10 … 0/10.")]
-    [SerializeField] private TMPro.TMP_Text counterText;
+    [Tooltip("Spins left, counting down: 10, 9 … 0. Sprite digits.")]
+    [SerializeField] private TMPro.TMP_Text remainingSpinsText;
+
+    [Tooltip("The round's total spins. Goes up on a retrigger. Sprite digits.")]
+    [SerializeField] private TMPro.TMP_Text totalSpinsText;
 
     [Header("Congratulations Panel")]
     [Tooltip("\"CONGRATULATIONS / x / FREE GAMES AWARDED\". Opens, holds, and closes by itself.")]
@@ -37,10 +42,28 @@ public class FreeGameView : MonoBehaviour
 
     // A documented exception to "tuning lives in code": judged by eye, so serialized, and the
     // scene's value is the one that runs.
-    [Tooltip("Seconds the congratulations panel stays up before closing by itself.")]
+    [Tooltip("Seconds the congratulations panel stays up before closing by itself. The titles' pop-in counts within it.")]
     [SerializeField] private float congratulationsHold = 2.5f;
 
+    [Header("Congratulations Titles")]
+    [Tooltip("The \"Congratulations\" text image. Pops in from nothing, then pulses while the panel is up.")]
+    [SerializeField] private RectTransform congratulationsTitle;
+
+    [Tooltip("The \"Free Games Awarded\" text image. Pops in with the other title, at the same moment.")]
+    [SerializeField] private RectTransform freeGamesAwardedTitle;
+
+    // Feel, tuned by eye — serialized like congratulationsHold, so the scene's values win.
+    [Tooltip("Seconds for each title to pop in from scale 0 to full size (with a slight overshoot).")]
+    [SerializeField] private float titlePopDuration = 0.35f;
+
+    [Tooltip("The scale each title pulses up to after popping in, and back down to 1, for as long as the panel is up.")]
+    [SerializeField] private float titlePulseScale = 1.06f;
+
+    [Tooltip("Seconds for one half of the pulse (1 up to Title Pulse Scale, or back down).")]
+    [SerializeField] private float titlePulseDuration = 0.6f;
+
     private Coroutine activeSequence;
+    private readonly List<Tween> titleTweens = new List<Tween>();
 
     #region Public API — called by GameManager
 
@@ -90,6 +113,7 @@ public class FreeGameView : MonoBehaviour
         HideCounter();
 
         if (congratulationsPanelAnim != null) congratulationsPanelAnim.StopAnimation();
+        StopTitleAnimations();
         if (congratulationsPanel != null) congratulationsPanel.SetActive(false);
     }
 
@@ -105,6 +129,7 @@ public class FreeGameView : MonoBehaviour
         congratulationsPanel.SetActive(true);
         if (awardedSpinsText != null) awardedSpinsText.text = spins.ToString();
         if (congratulationsPanelAnim != null) congratulationsPanelAnim.StartAnimation();
+        StartTitleAnimations();
 
         if (congratulationsHold > 0f) yield return new WaitForSeconds(congratulationsHold);
 
@@ -113,19 +138,60 @@ public class FreeGameView : MonoBehaviour
         // is not a reliable way to end a looping clip.
         AudioManager.Instance?.PlayCongratsClose();
         if (congratulationsPanelAnim != null) congratulationsPanelAnim.StopAnimation();
+        StopTitleAnimations();
         congratulationsPanel.SetActive(false);
 
         activeSequence = null;
         onClosed?.Invoke();
     }
 
+    // Both titles pop in together from scale 0, then pulse. The pulse is a separate tween started when
+    // the pop completes — an infinitely looping tween cannot sit inside a DOTween Sequence. The awarded
+    // spin count between them is deliberately left still (owner).
+    private void StartTitleAnimations()
+    {
+        StopTitleAnimations();
+        PopThenPulse(congratulationsTitle);
+        PopThenPulse(freeGamesAwardedTitle);
+    }
+
+    private void PopThenPulse(RectTransform title)
+    {
+        if (title == null) return;
+
+        title.localScale = Vector3.zero;
+
+        Tween pop = title.DOScale(1f, Mathf.Max(0.01f, titlePopDuration)).SetEase(Ease.OutBack);
+        pop.OnComplete(() =>
+        {
+            Tween pulse = title.DOScale(titlePulseScale, Mathf.Max(0.01f, titlePulseDuration))
+                .SetEase(Ease.InOutSine)
+                .SetLoops(-1, LoopType.Yoyo);
+            titleTweens.Add(pulse);
+        });
+        titleTweens.Add(pop);
+    }
+
+    // Killing the pop before it finishes also stops its pulse from ever starting, since a killed
+    // tween never runs its OnComplete. Scales go back to 1 so the panel never reopens mid-pulse.
+    private void StopTitleAnimations()
+    {
+        foreach (var tween in titleTweens) tween?.Kill();
+        titleTweens.Clear();
+
+        if (congratulationsTitle != null) congratulationsTitle.localScale = Vector3.one;
+        if (freeGamesAwardedTitle != null) freeGamesAwardedTitle.localScale = Vector3.one;
+    }
+
     #endregion
 
     #region Helpers
 
+    // Counts, not money — ToSpriteDigits rather than ToSpriteMoney, so 10 stays "10" and not "10.00".
     private void WriteCounter(int remaining, int total)
     {
-        if (counterText != null) counterText.text = remaining + "/" + total;
+        if (remainingSpinsText != null) remainingSpinsText.text = SpriteTextFormatter.ToSpriteDigits(remaining.ToString());
+        if (totalSpinsText != null) totalSpinsText.text = SpriteTextFormatter.ToSpriteDigits(total.ToString());
     }
 
     private void StopActiveSequence()

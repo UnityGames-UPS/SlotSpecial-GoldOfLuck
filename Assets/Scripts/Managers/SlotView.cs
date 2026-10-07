@@ -79,7 +79,7 @@ public class SlotView : MonoBehaviour
         {3, DefaultSymbolSize},  // Parrot
         {4, DefaultSymbolSize},  // Turban
         {5, DefaultSymbolSize},  // Carpet
-        {6, DefaultSymbolSize},  // Sword
+        {6, new Vector2(300f, 300f)},  // Sword
         {7, DefaultSymbolSize},  // Potion
         {8, new Vector2(262.5f, 262.5f)},  // Genie (oversized)
         {9, new Vector2(300f, 600f)}   // Lamp
@@ -1105,8 +1105,22 @@ public class SlotView : MonoBehaviour
     #region Stop Symbol Animations
 
     // loopCount <= 0 means "animate indefinitely", until something calls KillWinTweens — the next
-    // StartSpin, or ClearTriggerAnimation. The Genie Wheel trigger and a retrigger both pass a count.
+    // StartSpin, or ClearTriggerAnimation. Used by the free-spins retrigger, which passes a count.
     internal void AnimateAllScatters(int loopCount)
+    {
+        AnimateScatters(loopCount, playOnce: false);
+    }
+
+    // The Genie Wheel trigger: every Lamp plays its clip exactly ONCE, all the way through, and holds
+    // its last frame — no loop, and no timed stop cutting it short. It stays on screen under the first
+    // full-screen Genie animation until the board is cleared beneath that animation's held frame
+    // (ClearTriggerAnimation), so it keeps playing behind the Genie rather than ending before it.
+    internal void PlayAllScattersOnce()
+    {
+        AnimateScatters(loopCount: 0, playOnce: true);
+    }
+
+    private void AnimateScatters(int loopCount, bool playOnce)
     {
         if (currentDisplayMatrix == null) return;
 
@@ -1127,7 +1141,7 @@ public class SlotView : MonoBehaviour
 
                 if (currentDisplayMatrix[col][localRow] == actualScatterId)
                 {
-                    AnimateSymbolSingleLoop(col, localRow, loopCount);
+                    AnimateSymbolSingleLoop(col, localRow, loopCount, playOnce);
                 }
             }
         }
@@ -1152,7 +1166,7 @@ public class SlotView : MonoBehaviour
     // The dim is deliberately NOT raised here. AnimateAllScatters opens with KillWinTweens, which
     // lowers it, and the scatter trigger is meant to play over a normal board rather than a
     // darkened one.
-    private void AnimateSymbolSingleLoop(int column, int row, int loopCount = 1)
+    private void AnimateSymbolSingleLoop(int column, int row, int loopCount = 1, bool playOnce = false)
     {
         if (currentDisplayMatrix == null) return;
         if (column < 0 || column >= ReelCount || row < 0 || row >= RowCount) return;
@@ -1197,7 +1211,10 @@ public class SlotView : MonoBehaviour
         if (winDimOverlay != null) winDimOverlay.SetActive(true);
 
         imageAnim.textureArray = animSprites;
-        imageAnim.doLoopAnimation = true;
+        // Play-once runs the clip to its end and leaves the last frame up: with looping off,
+        // ImageAnimation stops itself there, and a later StopAnimation does not rewind a clip that
+        // has already finished.
+        imageAnim.doLoopAnimation = !playOnce;
         imageAnim.onLoopComplete = null;
         // Only read inside StartAnimation, and these slots are reused every spin, so an unwritten
         // speed is whichever symbol used this slot last.
@@ -1207,10 +1224,9 @@ public class SlotView : MonoBehaviour
 
         seq.AppendCallback(() => imageAnim.StartAnimation());
 
-        // loopCount <= 0 means run indefinitely — skip scheduling the stop entirely and let
-        // whatever kills winTweens end it. The free-games trigger passes 0 so the scatters keep
-        // playing behind the award prompt; the retrigger passes scatterTriggerLoops for a bounded run.
-        if (loopCount > 0)
+        // A timed stop only for a counted run (the retrigger's scatterTriggerLoops). loopCount <= 0
+        // runs until whatever kills winTweens ends it, and play-once ends on its own last frame.
+        if (!playOnce && loopCount > 0)
         {
             seq.AppendInterval(winSymbolLoopDuration * loopCount);
 
@@ -1361,8 +1377,9 @@ public class SlotView : MonoBehaviour
         bool skipPhase2 = gameManager != null
             && (gameManager.isInFreeSpins || gameManager.isAutoPlaying);
 
-        // Show Phase 1 Total Win Text with final win value
-        ShowPhase1TotalWin(totalWinAmount);
+        // SpinWinText switched off (owner): a win shows its symbols animating, with no total on the
+        // board. The win box still shows the amount.
+        // ShowPhase1TotalWin(totalWinAmount);
 
         AudioManager.Instance?.PlayWinPresentationStart();
 
@@ -1409,32 +1426,37 @@ public class SlotView : MonoBehaviour
     // StartSpin.
     private IEnumerator PlayWinLineCycleRoutine(List<WinLine> winLines, HashSet<int> allWinPositions, double totalWinAmount)
     {
-        // Once through every line, each line playing its symbols once in step. Bounded, unlike the
-        // old cycle: what loops at the end is the TOTAL, not the lines. Kept as a loop rather than a
-        // straight pass so the count stays a single constant to change.
-        for (int pass = 0; pass < winLinePassCount; pass++)
-        {
-            foreach (var winLine in winLines)
-            {
-                if (winLine.positions == null || winLine.positions.Count == 0) continue;
+        // The per-line walk is commented out (owner): Gold of Luck pays ways, not paylines, and a win
+        // just shows every winning symbol animating together. What is left of this routine is the
+        // closing hold below. Kept rather than deleted while the ways win presentation is designed.
+        //
+        // // Once through every line, each line playing its symbols once in step. Bounded, unlike the
+        // // old cycle: what loops at the end is the TOTAL, not the lines. Kept as a loop rather than a
+        // // straight pass so the count stays a single constant to change.
+        // for (int pass = 0; pass < winLinePassCount; pass++)
+        // {
+        //     foreach (var winLine in winLines)
+        //     {
+        //         if (winLine.positions == null || winLine.positions.Count == 0) continue;
+        //
+        //         KillWinTweens(false);
+        //
+        //         // Lines are a Phase 2 thing only — the total shows every winning symbol at once with
+        //         // no line drawn, then this walks them one at a time.
+        //         AudioManager.Instance?.PlayWinLineChange();
+        //         ShowWinLine(winLine);
+        //
+        //         yield return StartCoroutine(AnimateWinPositions(winLine.positions, rounds: winLineRounds));
+        //     }
+        // }
 
-                KillWinTweens(false);
-
-                // Lines are a Phase 2 thing only — the total shows every winning symbol at once with
-                // no line drawn, then this walks them one at a time.
-                AudioManager.Instance?.PlayWinLineChange();
-                ShowWinLine(winLine);
-
-                yield return StartCoroutine(AnimateWinPositions(winLine.positions, rounds: winLineRounds));
-            }
-        }
-
-        // Back to the total, and hold. rounds: 0 starts everything looping and returns at once, so
-        // this coroutine ends here with the board still animating — the next spin's teardown is what
-        // stops it. Nulling the handle lets PlayWinLineCycle start a fresh sequence if a round ends.
+        // Every winning symbol, looping, and hold. rounds: 0 starts everything looping and returns at
+        // once, so this coroutine ends here with the board still animating — the next spin's teardown
+        // is what stops it. Nulling the handle lets PlayWinLineCycle start a fresh sequence if a round
+        // ends.
         KillWinTweens(false);
         HideAllWinLines();
-        ShowPhase1TotalWin(totalWinAmount);
+        // ShowPhase1TotalWin(totalWinAmount);   // SpinWinText switched off (owner)
 
         yield return StartCoroutine(AnimateWinPositions(allWinPositions, rounds: 0));
 

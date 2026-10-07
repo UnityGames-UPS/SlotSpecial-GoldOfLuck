@@ -1,0 +1,520 @@
+fileFormatVersion: 2
+guid: 65d9879c073424d2ba3ee31fd4fb6fb1
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -8782070143727858947
+    second: FGA_Text 1_0
+  - first:
+      213: -3863446576777842924
+    second: FGA_Text 1_1
+  - first:
+      213: 3476625373065227328
+    second: FGA_Text 1_2
+  - first:
+      213: 9107040830370618012
+    second: FGA_Text 1_3
+  - first:
+      213: 5292665783501977573
+    second: FGA_Text 1_4
+  - first:
+      213: 7215266433498900202
+    second: FGA_Text 1_5
+  - first:
+      213: -885897738135608971
+    second: FGA_Text 1_6
+  - first:
+      213: 202733483612469847
+    second: FGA_Text 1_7
+  - first:
+      213: -7318989452924986355
+    second: FGA_Text 1_8
+  - first:
+      213: -8302816105084078796
+    second: FGA_Text 1_9
+  - first:
+      213: 4225143342539277978
+    second: FGA_Text 1_10
+  - first:
+      213: 5896665064614063654
+    second: FGA_Text 1_11
+  - first:
+      213: -5566025426913693772
+    second: FGA_Text 1_12
+  - first:
+      213: -1175301985042303748
+    second: FGA_Text 1_13
+  - first:
+      213: 7874346327453046875
+    second: FGA_Text 1_14
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 1
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: FGA_Text 1_0
+      rect:
+        serializedVersion: 2
+        x: 51
+        y: 42
+        width: 115
+        height: 170
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: dfa8982dbb1df1680800000000000000
+      internalID: -8782070143727858947
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FGA_Text 1_1
+      rect:
+        serializedVersion: 2
+        x: 181
+        y: 42
+        width: 143
+        height: 170
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 41f257ecec7426ac0800000000000000
+      internalID: -3863446576777842924
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FGA_Text 1_2
+      rect:
+        serializedVersion: 2
+        x: 337
+        y: 42
+        width: 113
+        height: 170
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 04ca9aa5b547f3030800000000000000
+      internalID: 3476625373065227328
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FGA_Text 1_3
+      rect:
+        serializedVersion: 2
+        x: 469
+        y: 42
+        width: 113
+        height: 170
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c9a18315265b26e70800000000000000
+      internalID: 9107040830370618012
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FGA_Text 1_4
+      rect:
+        serializedVersion: 2
+        x: 660
+        y: 37
+        width: 150
+        height: 180
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5e7ff740d73537940800000000000000
+      internalID: 5292665783501977573
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FGA_Text 1_5
+      rect:
+        serializedVersion: 2
+        x: 815
+        y: 42
+        width: 166
+        height: 170
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ae66088d796c12460800000000000000
+      internalID: 7215266433498900202
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FGA_Text 1_6
+      rect:
+        serializedVersion: 2
+        x: 991
+        y: 42
+        width: 179
+        height: 170
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 571ea1b63b8a4b3f0800000000000000
+      internalID: -885897738135608971
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FGA_Text 1_7
+      rect:
+        serializedVersion: 2
+        x: 1192
+        y: 43
+        width: 112
+        height: 169
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 75a7cca770140d200800000000000000
+      internalID: 202733483612469847
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FGA_Text 1_8
+      rect:
+        serializedVersion: 2
+        x: 1373
+        y: 42
+        width: 166
+        height: 170
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d0c5397ced9bd6a90800000000000000
+      internalID: -7318989452924986355
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FGA_Text 1_9
+      rect:
+        serializedVersion: 2
+        x: 1531
+        y: 43
+        width: 202
+        height: 169
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 435321d1eb876cc80800000000000000
+      internalID: -8302816105084078796
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FGA_Text 1_10
+      rect:
+        serializedVersion: 2
+        x: 1725
+        y: 42
+        width: 166
+        height: 170
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a960929fb79b2aa30800000000000000
+      internalID: 4225143342539277978
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FGA_Text 1_11
+      rect:
+        serializedVersion: 2
+        x: 1901
+        y: 42
+        width: 142
+        height: 170
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 62ee6c762a925d150800000000000000
+      internalID: 5896665064614063654
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FGA_Text 1_12
+      rect:
+        serializedVersion: 2
+        x: 2057
+        y: 42
+        width: 146
+        height: 170
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4bf64024d5181c2b0800000000000000
+      internalID: -5566025426913693772
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FGA_Text 1_13
+      rect:
+        serializedVersion: 2
+        x: 2222
+        y: 43
+        width: 112
+        height: 169
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: cf4fdb5521d70bfe0800000000000000
+      internalID: -1175301985042303748
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FGA_Text 1_14
+      rect:
+        serializedVersion: 2
+        x: 2359
+        y: 42
+        width: 146
+        height: 170
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b589d36c34c474d60800000000000000
+      internalID: 7874346327453046875
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 5e97eb03825dee720800000000000000
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      FGA_Text 1_0: -8782070143727858947
+      FGA_Text 1_1: -3863446576777842924
+      FGA_Text 1_10: 4225143342539277978
+      FGA_Text 1_11: 5896665064614063654
+      FGA_Text 1_12: -5566025426913693772
+      FGA_Text 1_13: -1175301985042303748
+      FGA_Text 1_14: 7874346327453046875
+      FGA_Text 1_2: 3476625373065227328
+      FGA_Text 1_3: 9107040830370618012
+      FGA_Text 1_4: 5292665783501977573
+      FGA_Text 1_5: 7215266433498900202
+      FGA_Text 1_6: -885897738135608971
+      FGA_Text 1_7: 202733483612469847
+      FGA_Text 1_8: -7318989452924986355
+      FGA_Text 1_9: -8302816105084078796
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

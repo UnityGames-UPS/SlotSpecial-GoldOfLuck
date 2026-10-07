@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 public class AudioManager : MonoBehaviour
@@ -92,6 +93,14 @@ public class AudioManager : MonoBehaviour
     [Tooltip("Scatter anticipation: plays while reels are held after two Lamps have landed, and is cut when the last held reel lands. Needs anticipationSource.")]
     [SerializeField] private AudioClip clipAnticipation;
 
+    [Tooltip("The Genie Wheel feature's music. Replaces the main track from the first full-screen Genie animation until the board is reset to base — through the free spins too, when the wheel awards them.")]
+    [SerializeField] private AudioClip clipWheelBg;
+
+    // A music switch dips rather than overlaps: there is one music source, so the old track fades out
+    // over the first half and the new one starts and fades in over the second.
+    private const float MusicFadeDuration = 0.5f;
+    private Coroutine musicFadeRoutine;
+
     private bool _musicEnabled = true;
     private bool _sfxEnabled   = true;
     private float _musicVolume = 0.5f;
@@ -173,15 +182,67 @@ public class AudioManager : MonoBehaviour
         source.loop = false;
     }
 
-    // 1. Game Main BG
-    internal void PlayBgMusic()
-    {
-        if (bgMusicSource == null || clipGameMainBg == null) return;
-        if (bgMusicSource.isPlaying && bgMusicSource.clip == clipGameMainBg) return;
+    // 1. Game Main BG. Starts instantly at load; coming back from the Genie Wheel's music it fades
+    // across and restarts the main track from the beginning (owner).
+    internal void PlayBgMusic() => SwitchMusic(clipGameMainBg);
 
-        bgMusicSource.clip   = clipGameMainBg;
+    // The Genie Wheel feature's music, from the first full-screen Genie animation until the board is
+    // reset to base. Free spins awarded by the wheel play under it too.
+    internal void PlayWheelBg() => SwitchMusic(clipWheelBg);
+
+    // The one way the music track changes. Already playing that track: nothing happens, so it never
+    // restarts mid-play. Nothing playing yet: starts straight away. Otherwise the 0.5 s dip. A missing
+    // clip leaves whatever is playing alone.
+    private void SwitchMusic(AudioClip clip)
+    {
+        if (bgMusicSource == null || clip == null) return;
+        if (bgMusicSource.isPlaying && bgMusicSource.clip == clip) return;
+
+        if (musicFadeRoutine != null)
+        {
+            StopCoroutine(musicFadeRoutine);
+            musicFadeRoutine = null;
+        }
+
+        if (!bgMusicSource.isPlaying)
+        {
+            StartMusic(clip, _musicEnabled ? _musicVolume : 0f);
+            return;
+        }
+
+        musicFadeRoutine = StartCoroutine(FadeToMusic(clip));
+    }
+
+    private IEnumerator FadeToMusic(AudioClip clip)
+    {
+        float half = MusicFadeDuration * 0.5f;
+        float startVolume = bgMusicSource.volume;
+
+        for (float t = 0f; t < half; t += Time.unscaledDeltaTime)
+        {
+            bgMusicSource.volume = Mathf.Lerp(startVolume, 0f, t / half);
+            yield return null;
+        }
+
+        StartMusic(clip, 0f);
+
+        // The target is re-read every frame, so a slider moved during the fade still lands right.
+        for (float t = 0f; t < half; t += Time.unscaledDeltaTime)
+        {
+            bgMusicSource.volume = Mathf.Lerp(0f, _musicEnabled ? _musicVolume : 0f, t / half);
+            yield return null;
+        }
+
+        ApplyMusicVolume();
+        musicFadeRoutine = null;
+    }
+
+    // From the beginning, looped.
+    private void StartMusic(AudioClip clip, float volume)
+    {
+        bgMusicSource.clip   = clip;
         bgMusicSource.loop   = true;
-        bgMusicSource.volume = _musicEnabled ? _musicVolume : 0f;
+        bgMusicSource.volume = volume;
         bgMusicSource.Play();
     }
 

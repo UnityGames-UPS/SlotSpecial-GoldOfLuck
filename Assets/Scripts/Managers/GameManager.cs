@@ -18,9 +18,9 @@ public class GameManager : MonoBehaviour
     [SerializeField] private float quickSpinCycleDuration = 0.1f;
 
     [Header("Feature Timing")]
-    [Tooltip("How long the Lamps animate before the Genie Wheel's full-screen transition or, on a retrigger, before the counter climbs.")]
+    [Tooltip("Genie Wheel trigger: how long after the Lamps start animating the full-screen Genie animation begins — the Lamps play their clip once and keep going underneath it. Retrigger: how long before the counter climbs.")]
     [SerializeField] private float scatterTriggerHold = 3.5f;
-    [Tooltip("Lamp animation loops on a Genie Wheel trigger and on a retrigger. Time-based: each is SlotView's winSymbolLoopDuration.")]
+    [Tooltip("Retrigger only: how long the Lamps animate, in SlotView winSymbolLoopDuration units. The Genie Wheel trigger plays the Lamp clip once instead.")]
     [SerializeField] private int scatterTriggerLoops = 2;
 
     [Header("Win Settings")]
@@ -740,13 +740,17 @@ public class GameManager : MonoBehaviour
     {
         GenieWheelData wheel = result.genieWheel;
 
-        // 1. The Lamps celebrate.
+        // 1. The Lamps celebrate: their clip plays once, through to the end, and carries on under the
+        //    Genie animation that starts after scatterTriggerHold — it is cleared beneath that
+        //    animation's held frame, not here.
         AudioManager.Instance?.PlayScatterTrigger();
-        if (slotView != null) slotView.AnimateAllScatters(scatterTriggerLoops);
+        if (slotView != null) slotView.PlayAllScattersOnce();
         yield return new WaitForSeconds(scatterTriggerHold);
 
         // 2. The full-screen animations. The board is cleared, and the stage swapped, beneath the
-        //    first one's held frame.
+        //    first one's held frame. The wheel's music takes over as the first one starts, and plays
+        //    until the board is reset to base — through the free spins too, if the wheel awards them.
+        AudioManager.Instance?.PlayWheelBg();
         if (genieWheelView != null)
         {
             bool entered = false;
@@ -798,11 +802,22 @@ public class GameManager : MonoBehaviour
     {
         GenieWheelData wheel = result.genieWheel;
 
+        // Back to base at the dim's darkest point, the main music with it.
+        System.Action resetToBase = () =>
+        {
+            if (genieWheelView != null) genieWheelView.ResetStageToBase(keepFeatureBackground: false);
+            AudioManager.Instance?.PlayBgMusic();
+        };
+
         if (genieWheelView != null)
         {
             bool reset = false;
-            genieWheelView.PlayDimTransition(() => genieWheelView.ResetStageToBase(keepFeatureBackground: false), () => reset = true);
+            genieWheelView.PlayDimTransition(resetToBase, () => reset = true);
             yield return new WaitUntil(() => reset);
+        }
+        else
+        {
+            resetToBase();
         }
 
         // Second stage of the payout. The win box shows the wheel's prize alone — the server's
@@ -957,7 +972,8 @@ public class GameManager : MonoBehaviour
         freeSpinsRoundWin = 0;
         retriggerPending = false;
 
-        // No music change: Gold of Luck plays its one background track through the free spins too.
+        // No music change here: the wheel's music, started at the trigger, carries on through the round
+        // and gives way to the main track under the end-of-round dim.
 
         if (freeGameView != null) freeGameView.ShowCounter(freeSpinsRemaining, FreeSpinsTotalAwarded);
 
@@ -1011,6 +1027,7 @@ public class GameManager : MonoBehaviour
         {
             if (genieWheelView != null) genieWheelView.SetFeatureBackground(false);
             if (freeGameView != null) freeGameView.HideCounter();
+            AudioManager.Instance?.PlayBgMusic();
         };
 
         if (genieWheelView != null)
