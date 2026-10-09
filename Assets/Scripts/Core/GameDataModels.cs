@@ -445,17 +445,11 @@ public class WinLine
 [Serializable]
 public class FreeGameData
 {
-    // True when this spin was itself played on free-game credit. False on the spin that triggers a
-    // round — that one is a paid base spin and pays out normally. Derived from played, which is 0
-    // on the trigger spin and 1 or more on every free one, the last included.
-    public bool isFreeGame;
-
     // Spins left AFTER this one. Retriggers are folded in, so it can go up as well as down.
     public int spinsRemaining;
 
-    // Set on any spin whose wheel landed on a free-games slice — both the initial trigger and a
-    // retrigger. Paired with isFreeGame it tells them apart: trigger is (awarded && !isFreeGame),
-    // retrigger is (awarded && isFreeGame).
+    // Set on any spin whose wheel landed on a free-games slice. The controller only reads it inside a
+    // round, where it marks a retrigger; the initial award is handled by the Genie Wheel itself.
     public bool spinsAwarded;
 
     // The round's running total, server-authoritative. Excludes the trigger spin's own win.
@@ -475,13 +469,11 @@ public class GenieWheelData
     // Indexes GameConfig.wheelSlices.
     public int sliceIndex;
     public WheelSliceType type;
-    // Which are set depends on the type: COIN has a coin, FREE_GAMES has freeGames, and MULTIPLIER
-    // has both a coin and a multiplier.
-    public double coin;
-    public int multiplier;       // applied to the coin
-    public int freeGames;        // spins awarded
+    // Spins awarded — set on a FREE_GAMES landing only.
+    public int freeGames;
     // The cash prize, already inside SpinResult.winAmount. Always the server's figure — show this,
-    // never a value derived from coin or multiplier.
+    // never a value derived from the slice's coin or multiplier. (The result's coinAwarded and
+    // multiplierAwarded are read only to work out the type when the type word is unrecognised.)
     public double winAmount;
 }
 
@@ -703,8 +695,6 @@ public static class InitDataConverter
     // block is indistinguishable from "not in a round", which is the correct reading either way.
     //
     // Maps the wire's post-spin fields onto the per-spin meanings the controller was built on:
-    //  - isFreeGame is "played > 0". The trigger spin reports 0 and every free spin 1 or more, the
-    //    last one included — unlike inFreeGames, which turns false on that last spin.
     //  - spinsAwarded is "the wheel landed on a free-games slice". The wire's freeGames.triggered
     //    stays true for the whole round, so it cannot say which spin did the awarding.
     private static FreeGameData ConvertFreeGame(ServerFreeGamesResult serverFreeGames, ServerGenieWheelResult wheel)
@@ -716,7 +706,6 @@ public static class InitDataConverter
 
         return new FreeGameData
         {
-            isFreeGame = serverFreeGames.played > 0,
             spinsRemaining = serverFreeGames.remaining,
             spinsAwarded = wheelAwardedGames,
             roundWin = serverFreeGames.totalFreeGamesWin
@@ -741,8 +730,6 @@ public static class InitDataConverter
         data.triggered = true;
         data.sliceIndex = result.sliceIndex;
         data.type = ParseSliceType(result.type, result.coinAwarded, result.multiplierAwarded, result.freeGamesAwarded, "genieWheel result");
-        data.coin = result.coinAwarded;
-        data.multiplier = result.multiplierAwarded;
         data.freeGames = result.freeGamesAwarded;
         data.winAmount = result.winInCash;
         return data;

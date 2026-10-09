@@ -195,7 +195,6 @@ public class GenieWheelView : MonoBehaviour
 
     private class SliceRefs
     {
-        public Transform root;
         public TMP_Text amountText;
         public TMP_Text multiplierText;
     }
@@ -214,12 +213,12 @@ public class GenieWheelView : MonoBehaviour
     private bool isSpinning;
     private bool curveWarningLogged;
 
-    // The backend's slice list when the init has arrived, the scene's slices before that — so
-    // "Test Spin" works with no backend at all.
     // WinnerPanel's scale-up / reverse-and-scale-down choreography, shared with the congratulations
     // panel. Made in Awake, which is when it reads the panel's scene scale and the clip's own setup.
     private PanelClipPlayback winnerClip;
 
+    // The backend's slice list when the init has arrived, the scene's slices before that — so
+    // "Test Spin" works with no backend at all.
     private int SliceCount => slices != null && slices.Count > 0 ? slices.Count : sliceRefs.Count;
     private float SliceStep => 360f / Mathf.Max(1, SliceCount);
 
@@ -649,7 +648,7 @@ public class GenieWheelView : MonoBehaviour
         StopLoop(smokeSweep);
 
         // The free-games wedges light last: their masks fade out together, and the wheel spins only
-        // once they have gone.`
+        // once they have gone.
         if (freeGamesMaskGroup != null && freeGamesMaskGroup.gameObject.activeSelf)
         {
             freeGamesMaskGroup.DOKill();
@@ -972,7 +971,6 @@ public class GenieWheelView : MonoBehaviour
 
             sliceRefs.Add(new SliceRefs
             {
-                root = child,
                 amountText = amount != null ? amount.GetComponent<TMP_Text>() : null,
                 multiplierText = multiplier != null ? multiplier.GetComponent<TMP_Text>() : null
             });

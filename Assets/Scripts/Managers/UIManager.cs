@@ -204,6 +204,10 @@ public class UIManager : MonoBehaviour
     private System.Action universalWinPopupCallback;
     private Coroutine uwpAutoCloseCoroutine;
     private Tween uwpWinTween;
+    // The opening chain (pop, then the slow swell). Kept so the close can kill it directly: a chain's
+    // steps are not in DOTween's list of running tweens, so the rect's DOKill() cannot reach them, and
+    // the swell would keep growing the popup while the close shrinks it.
+    private Sequence uwpOpenSequence;
     // The amount the count-up is heading for. Taking early kills that tween mid-number, so the
     // close path needs the target to snap the label to before it collapses.
     private double uwpTargetWinAmount;
@@ -1508,13 +1512,16 @@ public class UIManager : MonoBehaviour
         universalWinPopup.SetActive(true);
         if (universalWinPopupRect)
         {
+            // A previous popup's swell could still be running if this one opens soon after it.
+            KillUniversalWinOpenSequence();
+            universalWinPopupRect.DOKill();
             universalWinPopupRect.localScale = Vector3.zero;
-            Sequence openSeq = DOTween.Sequence();
 
             // Fast snap in, then a slow constant swell that runs until just before the
             // auto-close (0.5s pop + 4s swell + 0.5s hold = uwpAutoCloseDelay). No overshoot.
-            openSeq.Append(universalWinPopupRect.DOScale(1.1f, 0.5f).SetEase(Ease.OutQuad));
-            openSeq.Append(universalWinPopupRect.DOScale(1.5f, 4f).SetEase(Ease.Linear));
+            uwpOpenSequence = DOTween.Sequence();
+            uwpOpenSequence.Append(universalWinPopupRect.DOScale(1.1f, 0.5f).SetEase(Ease.OutQuad));
+            uwpOpenSequence.Append(universalWinPopupRect.DOScale(1.5f, 4f).SetEase(Ease.Linear));
         }
 
         if (bigWinAmount != null && bigWinAmount.gameObject.activeSelf && winAmount > 0)
@@ -1548,6 +1555,15 @@ public class UIManager : MonoBehaviour
 
         if (uwpAutoCloseCoroutine != null) StopCoroutine(uwpAutoCloseCoroutine);
         uwpAutoCloseCoroutine = StartCoroutine(AutoCloseUniversalWinPopup());
+    }
+
+    private void KillUniversalWinOpenSequence()
+    {
+        if (uwpOpenSequence != null)
+        {
+            uwpOpenSequence.Kill();
+            uwpOpenSequence = null;
+        }
     }
 
     private IEnumerator AutoCloseUniversalWinPopup()
@@ -1599,8 +1615,10 @@ public class UIManager : MonoBehaviour
 
         if (universalWinPopupRect)
         {
-            // The BigWin open sequence runs for 4.5s, so a close triggered before it finishes
-            // would otherwise leave two scale tweens fighting over the same rect.
+            // The opening runs for 4.5s, so a close triggered before it finishes would otherwise
+            // leave the swell and the collapse fighting over the same rect. Killed by reference —
+            // DOKill() on the rect alone does not reach a chain's steps (see uwpOpenSequence).
+            KillUniversalWinOpenSequence();
             universalWinPopupRect.DOKill();
 
             Sequence closeSeq = DOTween.Sequence();

@@ -68,7 +68,7 @@ public class SlotView : MonoBehaviour
     //
     // Kept next to the sprite fields on purpose: both are id-keyed maps of the same symbol table, so
     // if the backend ever reorders it they have to be corrected together.
-    private static Vector2 DefaultSymbolSize = new Vector2(200f, 200f);
+    private static readonly Vector2 DefaultSymbolSize = new Vector2(200f, 200f);
     private static readonly Dictionary<int, Vector2> SymbolSizeOverrides = new Dictionary<int, Vector2>
     {
         {0, DefaultSymbolSize},  // Prince
@@ -143,9 +143,8 @@ public class SlotView : MonoBehaviour
     [SerializeField] private List<ReelImages> reelImagesList;
 
     // ── Symbol sizing / reel pitch ──────────────────────────────────────────────────────────────
-    // Deliberately NOT [SerializeField], for the same reason FreeGameView's timing constants are
-    // not: while these were serialized, the scene's saved values silently won over anything changed
-    // here, so retuning in code appeared to do nothing. Code is the single source of truth now. The
+    // Deliberately NOT [SerializeField]: while these were serialized, the scene's saved values
+    // silently won over anything changed here, so retuning in code appeared to do nothing. Code is the single source of truth now. The
     // trade is that they can no longer be nudged in Play mode — each change is a recompile.
 
     // Rect size used by every symbol not listed in SymbolSizeOverrides.
@@ -170,9 +169,9 @@ public class SlotView : MonoBehaviour
     // faking the same effect (see git history for the old stopOvershootDistance/
     // stopOvershootDuration/stopSettleDuration fields this replaced).
     [SerializeField] private Ease stopEase = Ease.OutBack;
-    [Tooltip("Overshoot strength for stopEase, same role as Pinball's landOvershoot (0.9 there). Sizzling7's icon spacing differs, so this needs its own tuning pass.")]
+    [Tooltip("Overshoot strength for stopEase — how far a reel bounces past its landing before it settles.")]
     [SerializeField] private float stopEaseOvershoot = 0.9f;
-    [Tooltip("Fixed duration for the landing tween. Pinball derives its landing duration from distance/reelSpeed instead, but Sizzling7's symbolHeight field doesn't reliably match the real icon spacing (275, hand-placed) right now, so an authored duration is used instead of deriving one — matches how every other stop-timing field in this file already works.")]
+    [Tooltip("Length of the landing tween. Authored rather than derived from distance and spin speed, like every other stop timing in this file.")]
     [SerializeField] private float stopDuration = 0.5f;
 
     [Header("Quick Spin Settings")]
@@ -197,9 +196,10 @@ public class SlotView : MonoBehaviour
     [Header("Win Animation Settings")]
     [SerializeField] private float winSymbolLoopDuration = 1.5f;
 
-    // The shape of the win presentation: the total plays every winning symbol twice in step, then
-    // the win lines are walked ONCE with each line playing once, then the total comes back and
-    // holds, looping, until the next spin.
+    // The shape of the win presentation: every winning symbol plays twice in step (once in autoplay
+    // and free spins), then holds, looping, until the next spin. The per-line walk that used to sit
+    // between them is commented out (owner) — see PlayWinLineCycleRoutine; the two line constants
+    // below belong to it.
     private const int totalWinRounds = 2;
     private const int winLinePassCount = 1;
     private const int winLineRounds = 1;
@@ -276,7 +276,7 @@ public class SlotView : MonoBehaviour
     private bool isSpinning;
 
     // Config-driven, not Inspector-array-length-driven: reelTransforms/reelImagesList may still
-    // have leftover unused slots from a previous reel count (e.g. CNY's 5 reels), so this must
+    // have leftover unused slots from an older game's layout, so this must
     // reflect the real backend's reel count, not the serialized array size.
     internal int ReelCount => (gameManager != null && gameManager.gameConfig != null)
         ? gameManager.gameConfig.reelCount
@@ -1316,7 +1316,8 @@ public class SlotView : MonoBehaviour
         // line walk afterwards — unless the controller asks for the walk while the total is still
         // playing, which is checked once the total ends (see lineWalkRequested).
         //
-        // Trigger spins never reach here — they returned above.
+        // A Genie Wheel trigger spin never reaches here: GameManager takes it over in
+        // PresentSpinOutcome and presents no win.
         bool skipPhase2 = gameManager != null
             && (gameManager.isInFreeSpins || gameManager.isAutoPlaying);
 
@@ -1328,8 +1329,13 @@ public class SlotView : MonoBehaviour
 
         // The total: every winning symbol, twice, in step. Autoplay and Free Games get a single
         // round and end here — a full sequence on every spin would make a round crawl.
-        yield return StartCoroutine(AnimateWinPositions(
-            allWinPositions, rounds: skipPhase2 ? 1 : totalWinRounds, announceWilds: true));
+        //
+        // Yielded directly, NOT through StartCoroutine. A nested StartCoroutine is its own coroutine:
+        // stopping this one (the next spin's KillWinTweens) left it running, waiting forever for
+        // loop-complete callbacks that teardown had already cleared — one stuck coroutine per
+        // interrupted win. Run inline, it stops with this one.
+        yield return AnimateWinPositions(
+            allWinPositions, rounds: skipPhase2 ? 1 : totalWinRounds, announceWilds: true);
 
         KillWinTweens(false);
         HidePhase1TotalWinText();
@@ -1389,7 +1395,7 @@ public class SlotView : MonoBehaviour
         //         AudioManager.Instance?.PlayWinLineChange();
         //         ShowWinLine(winLine);
         //
-        //         yield return StartCoroutine(AnimateWinPositions(winLine.positions, rounds: winLineRounds));
+        //         yield return AnimateWinPositions(winLine.positions, rounds: winLineRounds);
         //     }
         // }
 
@@ -1401,7 +1407,8 @@ public class SlotView : MonoBehaviour
         HideAllWinLines();
         // ShowPhase1TotalWin(totalWinAmount);   // SpinWinText switched off (owner)
 
-        yield return StartCoroutine(AnimateWinPositions(allWinPositions, rounds: 0));
+        // Inline for the same reason as the total above.
+        yield return AnimateWinPositions(allWinPositions, rounds: 0);
 
         winAnimationCoroutine = null;
     }
@@ -1727,8 +1734,8 @@ public class SlotView : MonoBehaviour
     // Takes the whole win layer down and restores every reel icon underneath it. The restore is
     // deliberately unconditional and paired with the hide in this one method: AnimateWinPositions
     // hides icons per winning cell, and if any of them were missed here that cell would stay blank
-    // for the rest of the session. Every teardown path runs through here — between Phase 2 lines,
-    // at the end of the cycle, on the next StartSpin, and on Start.
+    // for the rest of the session. Every teardown path runs through here — between the total and
+    // the closing hold, on the next StartSpin, and on Start.
     private void HideWinSlots()
     {
         if (animSlotColumns != null)

@@ -194,8 +194,7 @@ public class GameManager : MonoBehaviour
 
     internal void IncreaseBet()
     {
-        if (currentState != GameState.Idle || isAutoPlaying) return;
-        if (gameConfig == null || gameConfig.availableBets == null || gameConfig.availableBets.Count == 0) return;
+        if (!CanChangeBet()) return;
 
         int maxIndex = gameConfig.availableBets.Count - 1;
         int nextIndex = currentBetIndex + 1;
@@ -218,8 +217,7 @@ public class GameManager : MonoBehaviour
 
     internal void DecreaseBet()
     {
-        if (currentState != GameState.Idle || isAutoPlaying) return;
-        if (gameConfig == null || gameConfig.availableBets == null || gameConfig.availableBets.Count == 0) return;
+        if (!CanChangeBet()) return;
 
         int maxIndex = gameConfig.availableBets.Count - 1;
         int nextIndex = currentBetIndex - 1;
@@ -238,6 +236,17 @@ public class GameManager : MonoBehaviour
         }
 
         SetBetIndex(nextIndex);
+    }
+
+    // The bet is fixed for a whole feature. Between free spins the state is briefly Idle, so Idle alone
+    // doesn't keep it out — and a bet changed mid-round would re-project the wheel's labels and shift
+    // the big-win threshold for spins the player already started at the old bet. The locked buttons
+    // stop it in practice; this is the guard behind them.
+    private bool CanChangeBet()
+    {
+        if (currentState != GameState.Idle || isAutoPlaying) return false;
+        if (isInFreeSpins || isInGenieWheel) return false;
+        return gameConfig != null && gameConfig.availableBets != null && gameConfig.availableBets.Count > 0;
     }
 
     internal void SetBetIndex(int index)

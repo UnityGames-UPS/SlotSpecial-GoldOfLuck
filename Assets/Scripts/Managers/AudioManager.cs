@@ -93,6 +93,10 @@ public class AudioManager : MonoBehaviour
     [Tooltip("Scatter anticipation: plays while reels are held after two Lamps have landed, and is cut when the last held reel lands. Needs anticipationSource.")]
     [SerializeField] private AudioClip clipAnticipation;
 
+    [Tooltip("The big-win popup's sound (huge win.wav). Plays ONCE as the popup opens, and is cut when the popup " +
+             "closes — on Take or at the auto-close. While unassigned, the old looping clipBigWin plays instead.")]
+    [SerializeField] private AudioClip clipHugeWin;
+
     [Tooltip("The Genie Wheel feature's music. Replaces the main track from the first full-screen Genie animation until the board is reset to base — through the free spins too, when the wheel awards them.")]
     [SerializeField] private AudioClip clipWheelBg;
 
@@ -171,6 +175,17 @@ public class AudioManager : MonoBehaviour
         if (source == null || clip == null) return;
         source.clip   = clip;
         source.loop   = true;
+        source.volume = _sfxEnabled ? _sfxVolume : 0f;
+        source.Play();
+    }
+
+    // A single play of an EFFECT that may need cutting short — Play() rather than PlayOneShot, which
+    // StopSource could not stop. Follows the sfx volume like PlaySfxLoop.
+    private void PlaySfxOnce(AudioSource source, AudioClip clip)
+    {
+        if (source == null || clip == null) return;
+        source.clip   = clip;
+        source.loop   = false;
         source.volume = _sfxEnabled ? _sfxVolume : 0f;
         source.Play();
     }
@@ -258,19 +273,30 @@ public class AudioManager : MonoBehaviour
         PlayUISound(clipMaxBetReached);
     }
 
-    // 4. Bonus-trigger stinger — a one-shot, despite the CNY-era "Loop" in the name. It used to go
-    // through PlayLoop, which sets loop = true, and the matching Stop method had no callers — so the
-    // clip repeated for the rest of the session from the moment free games triggered. PlayUISound
+    // 4. Bonus-trigger stinger (the Lamps triggering the Genie Wheel) — a one-shot. It once went
+    // through a looping play method whose matching Stop had no callers, so the clip repeated for the
+    // rest of the session from the moment the feature triggered. PlayUISound
     // already null-guards and honours _sfxEnabled, so no guard is needed here.
     internal void PlayScatterTrigger()
     {
         PlayUISound(clipScatterTrigger);
     }
 
-    // 5. Win Object BG (Play at Open)
+    // 5. The big-win popup's sound. Gold of Luck's huge win plays once; Golden Dynasty's big win, the
+    // fallback while it is unassigned, loops. Either way it is played with Play() on uiSource rather
+    // than PlayOneShot, because a one-shot cannot be cut — and it has to stop with the popup. While it
+    // plays, uiSource reads as busy, so other UI sounds go to reserveSource and are not cut with it.
     internal void PlayBigWin()
     {
-        if (!_sfxEnabled || clipBigWin == null) return;
+        if (!_sfxEnabled) return;
+
+        if (clipHugeWin != null)
+        {
+            PlaySfxOnce(uiSource, clipHugeWin);
+            return;
+        }
+
+        if (clipBigWin == null) return;
         // PlaySfxLoop, not PlayLoop: this is an effect, not a music bed. PlayLoop stamps the source
         // with the *music* volume and StopSource never restores it, so every later UI sound on
         // uiSource kept playing at music level until something touched a volume slider.
@@ -279,14 +305,19 @@ public class AudioManager : MonoBehaviour
 
     internal void StopBigWin()
     {
-        if (uiSource != null && uiSource.clip == clipBigWin)
+        if (uiSource != null && IsBigWinClip(uiSource.clip))
         {
             StopSource(uiSource);
         }
-        if (reserveSource != null && reserveSource.clip == clipBigWin)
+        if (reserveSource != null && IsBigWinClip(reserveSource.clip))
         {
             StopSource(reserveSource);
         }
+    }
+
+    private bool IsBigWinClip(AudioClip clip)
+    {
+        return clip != null && (clip == clipHugeWin || clip == clipBigWin);
     }
 
     // 6. Stop / Take / AutoplayStop / WheelStart Btn Sound

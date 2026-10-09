@@ -44,7 +44,7 @@ public class FreeGameView : MonoBehaviour
 
     // A documented exception to "tuning lives in code": judged by eye, so serialized, and the
     // scene's values are the ones that run.
-    [Tooltip("Seconds the panel takes to scale up from 0 to its scene scale, with a slight overshoot. Its clip starts once it is full size.")]
+    [Tooltip("Seconds the panel takes to scale up from 0 to its scene scale, with a slight overshoot. Its clip starts Clip Early Start Frames before the scale-up ends.")]
     [SerializeField] private float panelScaleUpDuration = 0.35f;
 
     [Tooltip("How many clip frames before the scale-up finishes the panel's clip is started. ImageAnimation holds a " +
