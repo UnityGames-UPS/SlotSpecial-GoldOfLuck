@@ -143,9 +143,8 @@ public class SlotView : MonoBehaviour
     [SerializeField] private List<ReelImages> reelImagesList;
 
     // ── Symbol sizing / reel pitch ──────────────────────────────────────────────────────────────
-    // Deliberately NOT [SerializeField]: while these were serialized, the scene's saved values
-    // silently won over anything changed here, so retuning in code appeared to do nothing. Code is the single source of truth now. The
-    // trade is that they can no longer be nudged in Play mode — each change is a recompile.
+    // Not serialized, so the code is the single source of truth — a serialized value would be
+    // overridden by whatever the scene saved. The trade is that changing them needs a recompile.
 
     // Rect size used by every symbol not listed in SymbolSizeOverrides.
     private Vector2 normalSymbolSize = new Vector2(175f, 175f);
@@ -164,10 +163,7 @@ public class SlotView : MonoBehaviour
     [SerializeField] private float anticipationUpDuration = 0.12f;
 
     [Header("Stop Animation Settings")]
-    // Ported from PinballDoubleGold's SlotBehaviour.StopReelSpin: one continuous tween using
-    // DOTween's built-in overshoot-and-settle curve, instead of two separate tweens manually
-    // faking the same effect (see git history for the old stopOvershootDistance/
-    // stopOvershootDuration/stopSettleDuration fields this replaced).
+    // One continuous tween using DOTween's overshoot-and-settle curve for the landing.
     [SerializeField] private Ease stopEase = Ease.OutBack;
     [Tooltip("Overshoot strength for stopEase — how far a reel bounces past its landing before it settles.")]
     [SerializeField] private float stopEaseOvershoot = 0.9f;
@@ -197,8 +193,8 @@ public class SlotView : MonoBehaviour
     [SerializeField] private float winSymbolLoopDuration = 1.5f;
 
     // The shape of the win presentation: every winning symbol plays twice in step (once in autoplay
-    // and free spins), then holds, looping, until the next spin. The per-line walk that used to sit
-    // between them is commented out (owner) — see PlayWinLineCycleRoutine; the two line constants
+    // and free spins), then holds, looping, until the next spin. The per-line walk between them is
+    // commented out (owner) — see PlayWinLineCycleRoutine; the two line constants
     // below belong to it.
     private const int totalWinRounds = 2;
     private const int winLinePassCount = 1;
@@ -230,10 +226,9 @@ public class SlotView : MonoBehaviour
     private List<Tween> winTweens = new List<Tween>();
     private Coroutine winAnimationCoroutine;
 
-    // The controller asked for the line walk (PlayWinLineCycle) while a presentation was still on
-    // its total. That presentation decided at its start whether to walk the lines, so without this
-    // the request was simply dropped — stopping autoplay part-way through the total left the spin
-    // with no walk and no hold at all. Reset at the start of every presentation.
+    // Set when the controller asks for the line walk (PlayWinLineCycle) while a presentation is still
+    // on its total, which decided at its start whether to walk the lines. Honoured when the total
+    // ends; reset at the start of every presentation.
     private bool lineWalkRequested;
 
     // The lines from the spin that just landed, kept so the controller can start the Phase 2 cycle
@@ -247,22 +242,20 @@ public class SlotView : MonoBehaviour
     // More than one reel can be held in a single spin — see ComputeAnticipatedReels.
     private readonly HashSet<int> anticipatedReels = new HashSet<int>();
 
-    // A per-spin claim on the win dim: true while something raised it BEFORE the win presentation
+    // A per-spin claim on the win dim: true while something raised it before the win presentation
     // and means the presentation to inherit it, instead of dropping and re-raising it (which
-    // flickers). Nothing sets it today — the sequence that did has been removed — but the claim and
-    // its guards stay as the pattern anything drawing over the reels mid-spin should follow.
+    // flickers). Nothing sets it today; kept, with its guards, as the pattern to follow.
     private bool dimHeld;
 
     // A feature round's claim on the shared dim, alongside dimHeld above. A round that owns the
     // board holds this for its whole duration, so an ordinary win teardown inside the round cannot
-    // drop the dim out from under it. Nothing sets it today; like dimHeld it stays as the pattern,
-    // and anything that lowers the dim has to keep checking it.
+    // drop the dim out from under it. Nothing sets it today; kept like dimHeld.
     private bool featureDimHeld;
 
     // This spin's Genies and the multiplier each one carries, as flat index -> value. Captured when
     // the reels are told to stop, because the landing write runs per reel off each one's own stop,
     // and by the time the last reel lands the controller may already have consumed and cleared
-    // lastResult. Reading it at draw time was a race the last reel routinely lost.
+    // lastResult, so it is not read at draw time.
     private readonly Dictionary<int, int> landedGenieMultipliers = new Dictionary<int, int>();
 
     // Ids the scroll buffer is allowed to pick from. Built once and cached, since gameConfig doesn't
@@ -282,10 +275,8 @@ public class SlotView : MonoBehaviour
         ? gameManager.gameConfig.reelCount
         : (reelTransforms != null ? reelTransforms.Length : 3);
 
-    // Row count (3). Every row the server sends is live and pays — there is no decorative padding
-    // in this game, so a row index means the same thing in the server payload, in
-    // currentDisplayMatrix, and in each reel's displayImages list. The Sizzling-era
-    // totalResponseRowCount / ActiveRowStart pair that translated between those spaces is gone.
+    // Row count (3). Every row the server sends is live and pays, so a row index means the same thing
+    // in the server payload, in currentDisplayMatrix, and in each reel's displayImages list.
     internal int RowCount => (gameManager != null && gameManager.gameConfig != null) ? gameManager.gameConfig.rowCount : 3;
 
     // -1 rather than 0 when unknown, deliberately: 0 is a real symbol (the Prince), so a literal
@@ -720,12 +711,8 @@ public class SlotView : MonoBehaviour
 
         isSpinning = true;
 
-        // The previous spin's lines stop being "the lines from the spin that just landed" the
-        // moment a new one starts. Only a WINNING spin writes this field — a losing one never
-        // reaches ShowWinLineAnimation — so without this it held the last win of the session, and
-        // PlayWinLineCycle replayed that old win, amounts and all, over whatever board was now
-        // showing: at the end of autoplay or Free Games after a losing spin, or over the spinning
-        // reels when autoplay was stopped mid-spin. Cleared, a losing spin leaves nothing to replay.
+        // Cleared at every spin start: only a winning spin writes it, so a losing spin must not leave
+        // the previous win for PlayWinLineCycle to replay over the new board.
         lastWinLines = null;
 
         KillAllTweens();
@@ -777,10 +764,8 @@ public class SlotView : MonoBehaviour
             spinTweens[columnIndex] = startSequence;
     }
 
-    // One continuous loop tween per column, replacing the old "shift one row then snap"
-    // illusion. The strip's sprite content is set once at StartSpin() and stays static for the
-    // rest of the spin — reshuffling it on every loop wrap was visible as symbols popping/
-    // changing mid-scroll, so the buffer is deliberately left untouched here.
+    // One continuous loop tween per column. The strip's sprites are set once at StartSpin() and left
+    // alone for the rest of the spin — reshuffling on each wrap shows as symbols popping mid-scroll.
     private void StartContinuousLoop(int columnIndex)
     {
         if (columnIndex >= reelTransforms.Length) return;
@@ -992,8 +977,7 @@ public class SlotView : MonoBehaviour
         {
             bool hasScatter = false;
 
-            // No literal fallback. The old ones were 1 for Wild and 0 for Scatter, which are this
-            // game's ids the wrong way round — correct-looking and silently inverted.
+            // No literal fallback: -1 before init can never match a real symbol id.
             int scatterId = gameManager != null && gameManager.gameConfig != null ? gameManager.gameConfig.scatterSymbolId : -1;
 
             var column = currentDisplayMatrix[columnIndex];
@@ -1040,8 +1024,7 @@ public class SlotView : MonoBehaviour
         }
         else
         {
-            // Single continuous tween — ported from Pinball's StopReelSpin, which uses
-            // Ease.OutBack's built-in overshoot-and-settle curve instead of two separate tweens.
+            // Single tween — the ease's own overshoot-and-settle does the bounce.
             Tween stopTween = slotTransform.DOLocalMoveY(middlePosition, stopDuration)
                 .SetEase(stopEase, stopEaseOvershoot)
                 .OnComplete(() =>
@@ -1146,14 +1129,8 @@ public class SlotView : MonoBehaviour
         KillWinTweens();
     }
 
-    // Plays one symbol's clip on the ANIMATION LAYER, the same surface AnimateWinPositions uses.
-    //
-    // This used to drive reel.displayImages[row] directly. Two costs came with that: every display
-    // icon needed its own ImageAnimation, added per-instance as a prefab override because
-    // SlotIcon.prefab carries none — so reverting one override silently killed the animation with
-    // no warning — and the clip played on the reel itself, BELOW the win dim, so anything holding
-    // the dim up would leave the scatters dark for the whole trigger sequence.
-    //
+    // Plays one symbol's clip on the animation layer, the same surface AnimateWinPositions uses, so
+    // it draws above the win dim rather than on the reel beneath it.
     private void AnimateSymbolSingleLoop(int column, int row, int loopCount = 1, bool playOnce = false)
     {
         if (currentDisplayMatrix == null) return;
@@ -1349,11 +1326,9 @@ public class SlotView : MonoBehaviour
         // by now, and this spin gets it the same way a manual spin would.
         if (skipPhase2 && !lineWalkRequested)
         {
-            // Take the presentation down on the way out. Mid-round this is invisible — the next
-            // spin's KillAllTweens would have cleared it — but on the last autoplay spin, and at the
-            // end of a free-games round, there is no next spin and the dim used to sit there until
-            // the player span again. The controller restarts the cycle via PlayWinLineCycle when the
-            // round is genuinely over.
+            // Take the presentation down on the way out: after the last autoplay spin, or at the end
+            // of a free-games round, there is no next spin to clear it. The controller restarts the
+            // cycle via PlayWinLineCycle when the round is genuinely over.
             winAnimationCoroutine = null;
 
             // Presentation is genuinely over here, so any dim still being held is released before
@@ -1826,11 +1801,10 @@ public class SlotView : MonoBehaviour
 
     // The win layer always comes down; the dim itself is skipped while something is holding it up.
     //
-    // Both holds below are inert today — nothing sets either flag since the features that did were
-    // removed — but the guards are the record of why they exist. Anything that raises the dim BEFORE
-    // the win presentation and means the presentation to inherit it needs a hold of this kind:
-    // without one, ShowWinLineAnimation's opening KillWinTweens drops the dim a frame before Phase 1
-    // raises it again, which reads as a flicker.
+    // Both holds below are inert today (nothing sets either flag). Anything that raises the dim before
+    // the win presentation and means the presentation to inherit it needs one: without it,
+    // ShowWinLineAnimation's opening KillWinTweens drops the dim a frame before it is raised again,
+    // which reads as a flicker.
     private void HideWinDim()
     {
         if (winAnimationLayer != null) winAnimationLayer.SetActive(false);

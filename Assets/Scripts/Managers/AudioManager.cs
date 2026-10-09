@@ -166,10 +166,7 @@ public class AudioManager : MonoBehaviour
         }
     }
 
-    // A looping EFFECT, so it follows the sfx toggle and slider — muting sfx must silence it. The
-    // one music bed (PlayBgMusic) sets its own volume from the music slider instead; an effect played
-    // that way stays stuck at music volume, which is how the big-win and bonus-trigger sounds once
-    // ended up ignoring the sfx setting.
+    // A looping effect, so it follows the sfx toggle and slider rather than the music volume.
     private void PlaySfxLoop(AudioSource source, AudioClip clip)
     {
         if (source == null || clip == null) return;
@@ -273,10 +270,7 @@ public class AudioManager : MonoBehaviour
         PlayUISound(clipMaxBetReached);
     }
 
-    // 4. Bonus-trigger stinger (the Lamps triggering the Genie Wheel) — a one-shot. It once went
-    // through a looping play method whose matching Stop had no callers, so the clip repeated for the
-    // rest of the session from the moment the feature triggered. PlayUISound
-    // already null-guards and honours _sfxEnabled, so no guard is needed here.
+    // 4. Bonus-trigger stinger (the Lamps triggering the Genie Wheel) — a one-shot.
     internal void PlayScatterTrigger()
     {
         PlayUISound(clipScatterTrigger);
@@ -297,9 +291,6 @@ public class AudioManager : MonoBehaviour
         }
 
         if (clipBigWin == null) return;
-        // PlaySfxLoop, not PlayLoop: this is an effect, not a music bed. PlayLoop stamps the source
-        // with the *music* volume and StopSource never restores it, so every later UI sound on
-        // uiSource kept playing at music level until something touched a volume slider.
         PlaySfxLoop(uiSource, clipBigWin);
     }
 
@@ -326,10 +317,8 @@ public class AudioManager : MonoBehaviour
         PlayUISound(clipPrimaryActionButton != null ? clipPrimaryActionButton : clipGeneralButtonClick);
     }
 
-    // Spin is a *duration* sound, not a button click: it loops for as long as the reels turn and is
-    // cut by StopSpinLoop at landing. Played as a one-shot it ran on past the landing (the clip is
-    // several seconds long) and stacked a fresh copy on every autoplay spin, since PlayOneShot never
-    // cancels the previous one.
+    // Spin is a duration sound, not a button click: it loops for as long as the reels turn and is cut
+    // by StopSpinLoop at landing.
     internal void PlaySpinStart()
     {
         if (!_sfxEnabled) return;

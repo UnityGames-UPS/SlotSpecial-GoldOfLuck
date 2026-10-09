@@ -306,8 +306,8 @@ public class GenieWheelView : MonoBehaviour
                 Debug.LogError($"[GenieWheelView] Slice {i} is a MULTIPLIER slice but has no \"{MultiplierTextName}\" child.");
             }
 
-            // A MULTIPLIER slice pays coin × multiplier × total bet, so it needs its coin. The backend
-            // once sent coin 0 on all six; a regression would otherwise just show 0.00 on the wedge.
+            // A MULTIPLIER slice pays coin × multiplier × total bet, so it needs its coin — without one
+            // the wedge would just show 0.00.
             if (slices[i].type == WheelSliceType.Multiplier && slices[i].coin <= 0)
             {
                 Debug.LogError($"[GenieWheelView] Slice {i} is a MULTIPLIER slice with no coin value — its wedge cannot show what it pays. Backend data?");

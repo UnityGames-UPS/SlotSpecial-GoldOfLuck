@@ -5,11 +5,9 @@ using System.Collections;
 
 public class OrientationChange : MonoBehaviour
 {
-    // Gold of Luck is portrait-only, so nothing here rotates. The version this was taken from
-    // forced landscape by turning the UI 90 degrees on tall screens; that rotation, and the
-    // UIWrapper it acted on, are gone. All that adapts is the CanvasScaler's match value, which
-    // letterboxes the 1080x1920 canvas — side margins on a wide desktop window, full-screen on a
-    // phone.
+    // Gold of Luck is portrait-only, so nothing here rotates. All that adapts is the CanvasScaler's
+    // match value, which letterboxes the 1080x1920 canvas — side margins on a wide desktop window,
+    // full-screen on a phone.
     [Header("References")]
     [SerializeField] private CanvasScaler CanvasScaler;
 
@@ -75,10 +73,7 @@ public class OrientationChange : MonoBehaviour
         }
         else
         {
-            // Fit the whole canvas inside the window. The version this came from picked between
-            // this and an axis-swapped variant, because its other branch was the rotated one —
-            // screen height mapped to canvas width there. Nothing rotates now, so the swap is
-            // always wrong and only this remains.
+            // Fit the whole canvas inside the window.
             float targetScale = Mathf.Min(widthScale, heightScale);
             float logRatio = Mathf.Log(heightScale / widthScale);
             targetMatch = Mathf.Clamp01(Mathf.Log(targetScale / widthScale) / logRatio);

@@ -366,12 +366,8 @@ public class GameManager : MonoBehaviour
         {
             if (currentSpinSpeed == SpinSpeed.QuickSpin || stopRequested)
             {
-                // The view reports when the snap has settled, exactly as the normal stop does. This
-                // used to wait a fixed 0.5s instead — a guess that only held because the reels
-                // happen to land in 0.44s. Raise quickStopStagger or quickStopDuration in the
-                // Inspector and the result was presented over a reel still landing, and the next
-                // spin could start while SlotView still thought it was spinning, so its reels never
-                // moved.
+                // The view reports when the snap has settled, as the normal stop does — never a fixed
+                // wait, which would break as soon as the quick-stop timings are retuned.
                 slotView.QuickStop(lastResult.resultMatrix, OnReelsStoppedComplete);
             }
             else
@@ -456,10 +452,8 @@ public class GameManager : MonoBehaviour
             uiManager.OnSpinStopping(lastResult);
             currentState = GameState.Idle;
 
-            // Still handed to the view, just with nothing to present. A losing spin can arrive with
-            // presentation state already raised — something earlier in the spin may have put the dim
-            // up for a win that is now never coming — and clearing that is SlotView's call, not this
-            // one's. Skipping the view here is what used to leave the board dimmed after a no-win.
+            // Still handed to the view, with nothing to present: SlotView owns the dim, and a losing
+            // spin may still need it taken down.
             if (slotView != null)
             {
                 slotView.ShowWinLineAnimation(null, OnWinAnimationComplete);
@@ -574,10 +568,9 @@ public class GameManager : MonoBehaviour
         ProcessSpinResult();
     }
 
-    // If a feature round ever wants a spin duration of its own, shorten it by the same PROPORTION
-    // turbo shortens a base spin rather than returning the base game's turbo duration directly —
-    // that figure can easily be LONGER than the feature's own normal duration, which once made Turbo
-    // and Quick Spin slower than Normal inside a round.
+    // If a feature round ever wants a spin duration of its own, shorten it by the same proportion
+    // Turbo shortens a base spin — the base game's Turbo duration can be longer than the feature's
+    // own Normal one.
     private float GetSpinDuration()
     {
         return currentSpinSpeed switch
@@ -593,12 +586,8 @@ public class GameManager : MonoBehaviour
     {
         lastResult = result;
 
-        // The result is not handed to SlotView here. It writes the display-block sprites itself
-        // when each reel lands, in StopSingleReel — in the same frame as the landing position
-        // snap, so the swap is never on screen. An earlier "preload" wrote them mid-spin as well,
-        // on a hand-tuned delay; it duplicated the landing write, was visible whenever the delay
-        // missed its narrow window, and telegraphed the result each time the icons swept back
-        // through the reel. Removed rather than retuned.
+        // The result is not handed to SlotView here. It writes the landed sprites itself as each reel
+        // lands (StopSingleReel), in the same frame as the landing snap, so the swap is never seen.
 
         // Update the round's numbers as soon as the response lands so the displays never lag the
         // reels. A retrigger needs no special handling: the server has already folded the extra
@@ -1080,8 +1069,8 @@ public class GameManager : MonoBehaviour
     // The round is over. The Winner panel counts the round's total up BEFORE the fade back to base —
     // the reverse of a cash landing — and Take both closes it and starts the fade.
     //
-    // The last spin's lines are not cycled here, unlike Golden Dynasty: free spins show no line walk
-    // (genieWheel.md §3.7b), and the cycle would carry on over the base game after the fade.
+    // The last spin's win is not replayed here: free spins show no line walk, and the cycle would
+    // carry on over the base game after the fade.
     private void EndFreeSpins()
     {
         double roundWin = freeSpinsRoundWin;

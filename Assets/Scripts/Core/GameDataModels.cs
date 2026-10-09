@@ -128,8 +128,8 @@ public class ServerFreeGamesFeature
     // Nothing is bound. "maxTotalFreeGames" (the cap on one round, retriggers included) is sent and
     // deliberately unbound: the server enforces it, and the client only shows what each spin reports.
     // "payMultiplier" is sent (1) but appliedMultiplier reads 1 on every captured win, free games
-    // included, and the win amounts arrive already multiplied. The old triggerCount / awardedCount /
-    // retriggerCount are gone: the wheel decides what a trigger awards.
+    // included, and the win amounts arrive already multiplied. What a trigger awards comes from the
+    // wheel.
 }
 
 [Serializable]
@@ -185,8 +185,7 @@ public class ServerSpinResponse
 [Serializable]
 public class ServerPlayerBalance
 {
-    // Nullable because an older backend sometimes sent null here. Gold of Luck has always sent a
-    // real number so far, but the guard is free.
+    // Nullable in case the server ever omits it; the converter falls back to a computed balance.
     public double? balance;
 }
 
@@ -199,7 +198,7 @@ public class ServerPayload
     // One entry per winning SYMBOL, not per way — waysCount says how many ways it covers.
     public List<ServerWaysWin> waysWins;
 
-    // Every Genie on the board, keyed "row,col" (a COMMA, unlike the old "row:col" maps), value the
+    // Every Genie on the board, keyed "row,col" (comma-separated), value the
     // multiplier that Genie carries. Sent for every Genie whether or not it is part of a win, so it
     // is a landing-time fact, not a win-time one.
     public Dictionary<string, int> genieMultipliers;
@@ -558,8 +557,7 @@ public static class InitDataConverter
         {
             if (serverSymbol == null) continue;
 
-            // The role comes from "group". Names are Genie and Lamp here, so the old name matching
-            // against "Wild" and "Scatter" would have found neither.
+            // The role comes from "group", never the name.
             string group = (serverSymbol.group ?? string.Empty).Trim().ToLowerInvariant();
 
             var payout = serverSymbol.payout ?? new List<double>();

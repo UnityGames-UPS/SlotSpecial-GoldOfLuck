@@ -46,11 +46,8 @@ public class UIManager : MonoBehaviour
     [SerializeField] private RectTransform universalWinPopupRect;
     [SerializeField] private TMP_Text bigWinAmount;
 
-    // One button, six modes. Spin / Stop / Take / AutoplayStop used to be four separate GameObjects
-    // (plus portrait twins) toggled by SetActive, all sitting at the same position and size — so
-    // "which object is active" and "what does the button do" were two things that had to be kept in
-    // step by hand. Now the mode is the single source of truth for the art, the click routing and
-    // the count text.
+    // One button, six modes. The mode is the single source of truth for the art, the click routing
+    // and the autoplay count (see SpinButtonMode).
     [Header("Spin Button")]
     [SerializeField] private Button spinButton;
     [Header("Spin Button - Portrait")]
@@ -66,8 +63,7 @@ public class UIManager : MonoBehaviour
     [SerializeField] private ButtonSpriteSet autoplayStopSprites;
 
     [Header("Auto Play Count")]
-    [Tooltip("Was a child of the old AutoplayStopBtn, so it hid with that object. Now a child of " +
-             "the shared spin button, shown only in AutoplayStop mode.")]
+    [Tooltip("Child of the shared spin button, shown only in AutoplayStop mode.")]
     [SerializeField] private GameObject autoSpinRemainingObject;
     [SerializeField] private TMP_Text autoSpinRemainingText;
     [Header("Auto Play Count - Portrait")]
@@ -110,9 +106,8 @@ public class UIManager : MonoBehaviour
     [SerializeField] private Button settingsBgCloseButtonPortrait;
     [SerializeField] private Button gameQuitButtonPortrait;
 
-    // All four sprites a Sprite Swap button needs, kept together. Setting only the idle sprite
-    // (what this used to do) leaves the Button's own SpriteState untouched, so hovering showed
-    // whichever mode's hover art was baked into the scene regardless of the current mode.
+    // All four sprites a Sprite Swap button needs, kept together so a mode change swaps the hover,
+    // pressed and disabled art as well as the idle sprite.
     [System.Serializable]
     public class ButtonSpriteSet
     {
@@ -401,8 +396,7 @@ public class UIManager : MonoBehaviour
             }
         }
 
-        // Stop, autoplay-stop and both Takes no longer have buttons of their own — OnSpinButtonPressed
-        // routes to each of them off the current mode.
+        // Stop, autoplay-stop and both Takes share the spin button: OnSpinButtonPressed routes on the mode.
 
         if (autoPlayCloseButton) autoPlayCloseButton.onClick.AddListener(CloseAutoPlayPanel);
         if (autoPlayCloseButtonPortrait) autoPlayCloseButtonPortrait.onClick.AddListener(CloseAutoPlayPanel);
@@ -578,10 +572,8 @@ public class UIManager : MonoBehaviour
 
         UpdateBalanceDisplay();
 
-        // In free games the win box shows the round's running total, so clearing it here made every
-        // spin snap to 0 and then back up once the reels landed. The round total is cleared where it
-        // actually resets: StartFreeSpins before the first spin, and SetSpinButtonMode(Spin) once
-        // the player has taken the win.
+        // In free games the win box shows the round's running total, so it is not cleared per spin —
+        // only by StartFreeSpins and by SetSpinButtonMode(Spin) once the win has been taken.
         if (gameManager == null || !gameManager.isInFreeSpins)
         {
             UpdateWinDisplay(0);
@@ -758,10 +750,8 @@ public class UIManager : MonoBehaviour
             return;
         }
 
-        // Free spins show the ordinary Spin button, greyed out, for the whole round — never Stop.
-        // Stop would imply the player can interrupt a spin they did not start and cannot stop, and
-        // the round used to sit on a disabled Start button instead, which read as though it were
-        // still waiting to be pressed.
+        // Free spins show the ordinary Spin button, greyed out, for the whole round — never Stop, which
+        // would imply the player can interrupt a spin they did not start.
         SpinButtonMode mode;
         if (gameManager != null && gameManager.isAutoPlaying)  mode = SpinButtonMode.AutoplayStop;
         else if (gameManager != null && gameManager.isInFreeSpins) mode = SpinButtonMode.Spin;
@@ -799,9 +789,8 @@ public class UIManager : MonoBehaviour
 
     public void OnSpinButtonHeld()
     {
-        // Spin mode only. The hold handler used to live on a SpinBtn object that was hidden in every
-        // other state, so visibility did this gating for free; the shared button is always visible,
-        // so holding on Stop / Take / Start / AutoplayStop has to be rejected explicitly.
+        // Spin mode only: the shared button is always visible, so a hold on Stop / Take / Start /
+        // AutoplayStop has to be rejected here.
         if (spinButtonMode != SpinButtonMode.Spin) return;
 
         if (gameManager.currentState == GameState.Idle && !gameManager.isAutoPlaying)
@@ -947,9 +936,8 @@ public class UIManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Swaps every visual state of a Sprite Swap button at once. Assigning only the idle sprite
-    /// leaves the hover/pressed/disabled art on whatever the scene baked in, which is how the speed
-    /// button ended up showing Normal's hover graphic while in Turbo or QuickSpin.
+    /// Swaps every visual state of a Sprite Swap button at once — idle, hover, pressed and disabled —
+    /// so the art always matches the current mode.
     /// </summary>
     private void ApplyButtonSprites(Button button, ButtonSpriteSet set, bool interactable = true)
     {
@@ -960,19 +948,13 @@ public class UIManager : MonoBehaviour
         Image img = button.image;
         if (img != null && set.normal != null)
         {
-            // Sprite Swap shows its hover art via overrideSprite, and the mode only ever changes
-            // from a click — so the pointer is still over the button and the old mode's hover
-            // sprite would stay on screen until it left. Clearing it shows the new mode's idle art
-            // immediately; Unity re-applies the correct hover on the next pointer event.
+            // overrideSprite is cleared so the new mode's art shows at once — the mode changes on a
+            // click, so the pointer is still over the button and the previous mode's hover sprite
+            // would otherwise stay up.
             img.sprite = set.normal;
 
-            // A disabled button needs its disabled art stamped on here rather than left to Unity.
-            // Sprite Swap only applies a state sprite on a state TRANSITION, and Selectable's
-            // interactable setter is guarded — assigning false to a button that is already false
-            // does nothing. Free spins hit that on every spin: the button is already disabled, this
-            // clears overrideSprite, nothing transitions, and the normal sprite is what stays on
-            // screen. Writing it directly makes the call idempotent instead of depending on a
-            // transition that may never fire.
+            // The disabled art is set directly: Sprite Swap only applies it on a state transition,
+            // and a button that is already disabled (every free spin) never transitions.
             img.overrideSprite = (!interactable && set.disabled != null) ? set.disabled : null;
         }
 
@@ -1193,9 +1175,7 @@ public class UIManager : MonoBehaviour
 
     #region Spin Button Modes
 
-    // Every state the one shared button can be in. Spin/Stop/AutoplayStop used to be separate
-    // GameObjects toggled by SetActive; the free-games and big-win states were sprite swaps on the
-    // spin object. All six are now modes on the same button.
+    // Every state the one shared button can be in.
     //
     // Modes that share art stay distinct because they answer to different owners: WinnerTake calls
     // back into GameManager for the Genie Wheel's Winner panel, BigWinTake closes the popup. A new
@@ -1226,10 +1206,7 @@ public class UIManager : MonoBehaviour
 
     internal void SetSpinButtonMode(SpinButtonMode mode, bool interactable = true)
     {
-        // Returning to Spin means a round is over, so the win box goes back to GOOD LUCK. This used
-        // to sit alongside a show/hide of a game logo left over from Sizzling 7s. The lesson from
-        // removing it: only hide something here that this method also showed, or a round ending will
-        // switch on an object the scene deliberately authored off, and leave it on.
+        // Returning to Spin means a round is over, so the win box goes back to GOOD LUCK.
         if (mode == SpinButtonMode.Spin)
         {
             UpdateWinDisplay(0);
@@ -1266,16 +1243,12 @@ public class UIManager : MonoBehaviour
             default:                            set = spinSprites; break;
         }
 
-        // ApplyButtonSprites rewrites overrideSprite every time. Without that the art stays whatever
-        // Unity's last Sprite Swap transition stamped on — which is why the Take button used to
-        // stay invisible until the player clicked it — and passing interactable through is what
-        // puts the disabled art on when the button is going out of service.
+        // interactable is passed through so the disabled art goes on when the button is greyed out.
         ApplyButtonSprites(spinButton, set, interactable);
         ApplyButtonSprites(spinButtonPortrait, set, interactable);
 
         SetButtonInteractable(spinButton, spinButtonPortrait, interactable);
 
-        // The count used to be a child of the autoplay-stop object and hid with it.
         SetGameObjectActive(autoSpinRemainingObject, autoSpinRemainingObjectPortrait,
                             mode == SpinButtonMode.AutoplayStop);
     }
@@ -1295,8 +1268,6 @@ public class UIManager : MonoBehaviour
         SetButtonInteractable(gameRulesOpenButton, gameRulesOpenButtonPortrait, enabled);
         SetButtonInteractable(guideOpenButton, guideOpenButtonPortrait, enabled);
         SetButtonInteractable(soundPanelOpenButton, soundPanelOpenButtonPortrait, enabled);
-        // The autoplay-stop button used to be locked here too. It no longer exists as its own
-        // object, and autoplay can't be running during a feature anyway — the Genie Wheel suspends it.
     }
 
     #endregion
@@ -1504,9 +1475,7 @@ public class UIManager : MonoBehaviour
             bigWinAmount.text = SpriteTextFormatter.ToSpriteDigits(FormatAmount(winAmount));
         }
 
-        // Take lets the player cut the popup short. It still auto-closes after uwpAutoCloseDelay if
-        // they don't press it — without the button the ~5s presentation was unskippable, since the
-        // big-win path disables every other control for its whole duration.
+        // Take lets the player cut the popup short; otherwise it auto-closes after uwpAutoCloseDelay.
         SetSpinButtonMode(SpinButtonMode.BigWinTake, interactable: true);
 
         universalWinPopup.SetActive(true);
@@ -1526,9 +1495,6 @@ public class UIManager : MonoBehaviour
 
         if (bigWinAmount != null && bigWinAmount.gameObject.activeSelf && winAmount > 0)
         {
-            // Fixed money format throughout the count-up. This previously derived its decimal
-            // count from the win value, so a 4.8 win counted with one decimal while a whole
-            // number counted as integers — the same inconsistency the money format now removes.
             bigWinAmount.text = SpriteTextFormatter.ToSpriteMoney(0);
 
             float countUpDuration = 3.8f;
