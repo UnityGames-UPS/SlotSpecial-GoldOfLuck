@@ -225,7 +225,10 @@ public class ServerWaysWin
     // ordered by column then row. This is the union across all the ways, not one path.
     public List<ServerCell> matchedPositions;
     // Already inside winInCash. Kept so the view can show "x2" without dividing anything back out.
-    public int genieMultiplierProduct;
+    // A double, not an int: it is averaged across the ways, so a Genie in only some of them makes it
+    // fractional (an x2 Genie in 2 of 4 ways sends 1.5). As an int, that failed the whole parse and
+    // the reels spun forever.
+    public double genieMultiplierProduct;
     public double winInCash;
 
     // Sent and deliberately unbound: basePayout, winInCredits, winType ("WAYS_MATCH" is the only
@@ -432,8 +435,9 @@ public class WinLine
     // Reels matched from the left, and how many ways the symbol wins on.
     public int matchCount;
     public int waysCount;
-    // Product of the Genies in the win, already inside winAmount. 1 when there is none.
-    public int multiplier;
+    // Product of the Genies in the win, already inside winAmount. 1 when there is none. Can be
+    // fractional — see ServerWaysWin.genieMultiplierProduct.
+    public double multiplier;
 }
 
 /// <summary>
@@ -874,7 +878,9 @@ public static class InitDataConverter
                 winAmount = waysWin.winInCash,
                 matchCount = waysWin.matchCount,
                 waysCount = waysWin.waysCount,
-                multiplier = Math.Max(1, waysWin.genieMultiplierProduct)
+                // A missing field deserializes as 0, which would read as "pays nothing"; treat it
+                // as no multiplier. Never clamps a real value: every way is x1 or more.
+                multiplier = Math.Max(1.0, waysWin.genieMultiplierProduct)
             });
         }
 
